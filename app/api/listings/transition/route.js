@@ -10,7 +10,7 @@ const transitions = {
     conflict: 'This offer has already been claimed, is no longer available, or was not offered to this account.',
   },
   requestVolunteer: {
-    set: "pickup_method = 'volunteer'",
+    set: "pickup_method = 'volunteer', volunteer_requested_at = now()",
     where: "l.status = 'claimed' AND l.pickup_by > now() AND l.receiver_id = $2 AND l.pickup_method IS NULL",
     conflict: 'A pickup choice is already set or the pickup window has closed.',
   },

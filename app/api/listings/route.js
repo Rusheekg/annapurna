@@ -1,6 +1,7 @@
 import { database } from '../../../lib/db';
 import { allergens, maxPortions, storageLabels, validId } from '../../../lib/listings';
 import { insertListingAndOffers } from '../../../lib/matching';
+import { runEscalation } from '../../../lib/escalation';
 
 const hour = 60 * 60 * 1000;
 const noMatchMessage = "Posted. No receiver can reach it in time yet; we'll keep offering it.";
@@ -14,6 +15,7 @@ export async function GET(request) {
   if (!validId(donorId)) return invalid('Choose a donor.');
 
   try {
+    await runEscalation();
     const { rows } = await database().query(
       'SELECT * FROM public.listings WHERE donor_id = $1 ORDER BY created_at DESC, id DESC',
       [donorId],

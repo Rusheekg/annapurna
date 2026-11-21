@@ -1,12 +1,18 @@
 ﻿'use client';
 
 import Image from 'next/image';
+import dynamic from 'next/dynamic';
 import { Clock3, Tags, ShieldCheck } from 'lucide-react';
 import HomeLiveFeed from '@/components/home-live-feed';
 import { LiveNotificationFeed } from '@/components/ui/live-notification-feed';
 import { readImpact, readWorkspaceListings } from './feed-data';
 import { useEffect, useRef, useState } from 'react';
-import { allergens, foods, maxPortions, storageLabels } from '../lib/listings';
+import { allergens, foods, handlingGuidance, maxPortions, minutesUntil, safetyNotice, storageLabels } from '../lib/listings';
+
+const NeighbourhoodMap = dynamic(() => import('@/components/neighbourhood-map'), {
+  ssr: false,
+  loading: () => <p className="muted mt-6" role="status">Loading map…</p>,
+});
 
 const roles = { donor: 'Donor', receiver: 'Receiver', volunteer: 'Volunteer' };
 const selectionKey = 'annapurna.selection';
@@ -20,11 +26,6 @@ async function readJson(url, options) {
 
 const deliverySteps = ['Posted', 'Claimed', 'Collected', 'Delivered'];
 const timestampFields = ['created_at', 'claimed_at', 'collected_at', 'delivered_at'];
-const pickupGuidance = {
-  hot: 'Keep hot until handover',
-  room_temp: 'Serve within about 2 hours of cooking',
-  chilled: 'Keep chilled until handover',
-};
 const workspaceActions = {
   Claim: { action: 'claim', change: (accountId) => ({ status: 'claimed', receiver_id: accountId }) },
   'Request volunteer': { action: 'requestVolunteer', change: () => ({ pickup_method: 'volunteer' }) },
@@ -59,7 +60,7 @@ function actionsForListing(listing, role, accountId, pickupOpen) {
 function listingNotification(listing, role, accountId, pending) {
   const expired = listing.status === 'expired';
   const pickup = new Date(listing.pickup_by);
-  const minutes = Math.ceil((pickup.getTime() - Date.now()) / 60000);
+  const minutes = minutesUntil(listing.pickup_by);
   const active = listing.status === 'posted' || listing.status === 'claimed';
   const pickupLabel = `Pickup by ${formatDate(pickup)}` +
     (active ? minutes > 0 ? ` (${minutes} min left)` : ' (window closed)' : '');
@@ -70,9 +71,9 @@ function listingNotification(listing, role, accountId, pending) {
     storageLabels[listing.storage],
     `Allergens: ${listing.allergens.join(', ') || 'None listed'}`,
     pickupLabel,
+    handlingGuidance(listing.storage, listing.cooked_at, active),
   ];
   if (role === 'receiver') {
-    details.push(pickupGuidance[listing.storage]);
     if (listing.pickup_method === 'volunteer') {
       details.push(listing.volunteer_id ? 'Volunteer assigned' : 'Volunteer requested');
     }
@@ -100,6 +101,10 @@ function listingNotification(listing, role, accountId, pending) {
     title: listing.food_items,
     body: listing.match_reason || details.join(' · '),
     details: listing.match_reason ? details.join(' · ') : undefined,
+    safetyNotice,
+    warning: expired ? 'Expired — do not send this food.' : undefined,
+    priority: role === 'volunteer' && listing.priority_pickup && !listing.volunteer_id && listing.status === 'claimed'
+      ? 'Priority pickup' : undefined,
     timeline,
     actions: pending ? [] : actionsForListing(listing, role, accountId, minutes > 0),
     status: listing.status,
@@ -182,6 +187,7 @@ function WorkspaceFeed({ role, accountId, revision = 0 }) {
 
   return (
     <section className="min-w-0" aria-label={title}>
+      {role === 'receiver' && <p className="safety-banner mb-3">{safetyNotice}</p>}
       {error && <p className="error mb-3" role="alert">{error}</p>}
       {Object.entries(actionErrors).map(([id, message]) => message && (
         <p key={id} className="error mb-3" role="alert">{message}</p>
@@ -232,6 +238,23 @@ function initialForm() {
   };
 }
 
+function repeatForm(listing) {
+  const foodItems = listing.food_items.split(', ');
+  const selectedFoods = [];
+  while (foods.includes(foodItems[0]) && !selectedFoods.includes(foodItems[0])) {
+    selectedFoods.push(foodItems.shift());
+  }
+  return {
+    ...initialForm(),
+    selectedFoods,
+    extraFood: foodItems.join(', '),
+    veg: listing.veg,
+    portions: String(listing.portions),
+    storage: listing.storage,
+    selectedAllergens: listing.allergens,
+  };
+}
+
 function Chips({ label, options, selected, onChange }) {
   return (
     <fieldset>
@@ -253,13 +276,29 @@ function Chips({ label, options, selected, onChange }) {
 function PostForm({ donorId, kgPerMeal, onPosted }) {
   const [form, setForm] = useState(initialForm);
   const [posting, setPosting] = useState(false);
+  const [repeating, setRepeating] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const update = (key, value) => setForm((previous) => ({ ...previous, [key]: value }));
 
+  async function repeatLastPost() {
+    setError('');
+    setNotice('');
+    setRepeating(true);
+    try {
+      const [listing] = await readJson('/api/listings?donorId=' + donorId);
+      if (listing) setForm(repeatForm(listing));
+      setNotice(listing ? 'Last post copied. Review the details and pickup times before posting.' : 'No previous post to repeat.');
+    } catch (failure) {
+      setError(failure.message);
+    } finally {
+      setRepeating(false);
+    }
+  }
+
   async function post(event) {
     event.preventDefault();
-    if (posting) return;
+    if (posting || repeating) return;
     setError('');
     setNotice('');
     const foodItems = [...form.selectedFoods, form.extraFood.trim()].filter(Boolean).join(', ');
@@ -292,8 +331,11 @@ function PostForm({ donorId, kgPerMeal, onPosted }) {
   return (
     <section className="panel min-w-0" aria-labelledby="post-title">
       <h2 id="post-title">Post surplus</h2>
+      <button type="button" className="secondary mb-4" disabled={posting || repeating} onClick={repeatLastPost}>
+        {repeating ? 'Loading last post…' : "Repeat yesterday's post"}
+      </button>
       <form onSubmit={post}>
-        <fieldset disabled={posting} className="grid gap-4">
+        <fieldset disabled={posting || repeating} className="grid gap-4">
           <Chips label="Food items" options={foods} selected={form.selectedFoods} onChange={(value) => update('selectedFoods', value)} />
           <label>Other food items<input value={form.extraFood} maxLength={400} onChange={(event) => update('extraFood', event.target.value)} /></label>
           <div className="grid grid-cols-2 gap-3">
@@ -485,6 +527,8 @@ export default function Home() {
               <WorkspaceFeed key={`${selection.role}-${selection.id}`} role={selection.role} accountId={selection.id} />
             </>
           ))}
+          {people && selection.id && <NeighbourhoodMap key={selection.role === 'volunteer' ? selection.id : 'all'}
+            volunteerId={selection.role === 'volunteer' ? selection.id : null} />}
         </main>
       ) : (
         <Landing onPost={() => openWorkspace('donor', selection.role === 'donor' ? selection.id : people?.donor[0]?.id)} />

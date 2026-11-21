@@ -43,6 +43,7 @@ CREATE TABLE public.listings (
   receiver_id integer REFERENCES public.receivers(id),
   volunteer_id integer REFERENCES public.volunteers(id),
   pickup_method text CHECK (pickup_method IN ('volunteer', 'self')),
+  volunteer_requested_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   claimed_at timestamptz,
   collected_at timestamptz,

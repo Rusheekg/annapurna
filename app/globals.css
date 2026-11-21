@@ -155,6 +155,52 @@ small, .muted { color: var(--muted); }
 .status-badge[data-status="collected"] { background: var(--forest); }
 .status-badge[data-status="delivered"] { background: var(--cream); color: var(--forest); }
 .status-badge[data-status="expired"] { background: var(--rust); }
+.pickup-priority { margin-left: 8px; border-color: var(--amber); color: var(--forest-ink); }
+.safety-banner {
+  padding: 8px 10px;
+  border-left: 2px solid var(--gold);
+  background: var(--cream);
+  color: var(--forest-ink);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.map-panel { margin-top: 32px; }
+.map-legend { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-bottom: 12px; color: var(--muted); font-size: 13px; }
+.map-legend li { display: flex; align-items: center; gap: 6px; }
+.map-marker {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--card);
+  border-radius: 50%;
+  background: var(--forest);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
+}
+.map-marker-receiver { background: var(--sage); }
+.map-marker-listing { background: var(--gold); border-color: var(--forest); }
+.map-route-key { width: 16px; border-top: 2px dashed var(--forest); }
+.map-route-picker { display: block; max-width: 550px; margin-bottom: 12px; }
+.neighbourhood-map {
+  isolation: isolate;
+  height: clamp(300px, 48vw, 440px);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--cream);
+}
+.neighbourhood-map.leaflet-container a { color: var(--forest); }
+.neighbourhood-map .leaflet-bar { box-shadow: 0 1px 2px rgb(0 0 0 / 4%); }
+.neighbourhood-map .leaflet-popup-content-wrapper, .neighbourhood-map .leaflet-popup-tip {
+  border-radius: 4px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
+}
+.neighbourhood-map .leaflet-popup-content {
+  max-width: min(240px, calc(100vw - 138px));
+  max-height: 220px;
+  overflow: auto;
+  font-family: var(--font-body), sans-serif;
+}
+.neighbourhood-map .leaflet-popup-content p { margin: 4px 0; }
+.map-listing { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
 
 legend { margin-bottom: .4rem; }
 input, select {
@@ -216,4 +262,5 @@ button:disabled { cursor: wait; }
   button, .chip, .secondary { min-height: 44px; }
   button[data-dismiss] { min-width: 44px; }
   button[data-dismiss]:focus-visible { opacity: 1; }
+  .neighbourhood-map.leaflet-container .leaflet-bar a { width: 44px; height: 44px; line-height: 44px; }
 }

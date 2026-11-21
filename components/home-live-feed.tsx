@@ -2,6 +2,7 @@
 
 import { LiveNotificationFeed } from "@/components/ui/live-notification-feed";
 import type { LiveNotification } from "@/components/ui/live-notification-feed";
+import { safetyNotice } from "@/lib/listings";
 
 // Synthetic demo events for the home page hero. All names are invented.
 const FOREST = "#22392B";
@@ -16,6 +17,7 @@ const ITEMS: LiveNotification[] = [
     app: "Hostel Block C Mess",
     title: "40 meals posted",
     body: "Veg rice, dal and sabzi · pickup by 9:30 PM",
+    safetyNotice,
     time: "6m",
     accent: FOREST,
     read: true,
@@ -42,6 +44,7 @@ const ITEMS: LiveNotification[] = [
     app: "Canteen 2, North Campus",
     title: "60 rotis matched to Blue Banyan Collective",
     body: "2.1 km · fits your need of 60 · arrives 70 min early",
+    safetyNotice,
     accent: SAGE,
     steps: ["Posted", "Claimed", "Collected", "Delivered"],
     step: 1,

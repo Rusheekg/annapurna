@@ -16,6 +16,9 @@ interface NotificationBase {
   title: string;
   body?: string;
   details?: string;
+  safetyNotice?: string;
+  priority?: string;
+  warning?: string;
   timeline?: { label: string; dateTime: string; text: string }[];
   /** Age label such as "4m". Items that land while the feed is open read "now". */
   time?: string;
@@ -944,6 +947,7 @@ function NotificationCard({
             style={{ transform: shown ? "none" : entry.leaving ? "translateX(18%) scale(0.98)" : "translateY(-16px) scale(0.96)", opacity: shown ? 1 : 0, transition: cardTransition }}
           >
             {item.status && <span className="status-badge" data-status={item.status}>{item.status}</span>}
+            {item.priority && <span className="status-badge pickup-priority">{item.priority}</span>}
             <div className="flex gap-3">
               <AppTile kind={item.kind} accent={item.accent} play={entry.play} delay={storyDelay} reduced={reduced} />
               <div className="min-w-0 flex-1">
@@ -969,6 +973,8 @@ function NotificationCard({
                 </button>
                 {item.body && <p className="mt-0.5 text-[13px] leading-snug text-muted-foreground">{item.body}</p>}
                 {item.details && <p className="mt-1 text-[13px] leading-snug text-muted-foreground">{item.details}</p>}
+                {item.warning && <p className="error mt-1 text-[13px] font-semibold">{item.warning}</p>}
+                {item.safetyNotice && <p className="safety-banner mt-2">{item.safetyNotice}</p>}
                 <div className={cx("mt-2.5", accentClass)} style={accentScope}>
                   <Detail item={item} play={entry.play} delay={storyDelay} reduced={reduced} />
                   {Boolean(item.timeline?.length) && (
