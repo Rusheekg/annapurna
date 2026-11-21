@@ -1,6 +1,11 @@
 ﻿'use client';
 
-import { useEffect, useState } from 'react';
+import Image from 'next/image';
+import { Clock3, Tags, ShieldCheck } from 'lucide-react';
+import HomeLiveFeed from '@/components/home-live-feed';
+import { LiveNotificationFeed } from '@/components/ui/live-notification-feed';
+import { readImpact, readWorkspaceListings } from './feed-data';
+import { useEffect, useRef, useState } from 'react';
 import { allergens, foods, storageLabels } from '../lib/listings';
 
 const roles = { donor: 'Donor', receiver: 'Receiver', volunteer: 'Volunteer' };
@@ -13,11 +18,51 @@ async function readJson(url, options) {
   return data;
 }
 
-function DonorListings({ donorId, kgPerMeal }) {
-  const [listings, setListings] = useState([]);
-  const [loaded, setLoaded] = useState(false);
+const deliverySteps = ['Posted', 'Claimed', 'Collected', 'Delivered'];
+
+function listingNotification(listing) {
+  const expired = listing.status === 'expired';
+  const pickup = new Date(listing.pickup_by);
+  const minutes = Math.ceil((pickup.getTime() - Date.now()) / 60000);
+  const active = listing.status === 'posted' || listing.status === 'claimed';
+  const pickupLabel = active && minutes > 0
+    ? `Pickup by ${formatDate(pickup)} (${minutes} min left)`
+    : `Pickup by ${formatDate(pickup)}`;
+  const details = [
+    `${listing.portions} portions`,
+    `${Number(listing.quantity_kg)} kg`,
+    listing.veg ? 'Veg' : 'Non-veg',
+    storageLabels[listing.storage],
+    `Allergens: ${listing.allergens.join(', ') || 'None listed'}`,
+    pickupLabel,
+  ];
+  if (listing.daily_need_meals && listing.portions <= listing.daily_need_meals) {
+    details.unshift(`Fits your need of ${listing.daily_need_meals}`);
+  }
+
+  return {
+    id: String(listing.id),
+    kind: 'delivery',
+    app: listing.donor_name || 'Annapurna',
+    title: listing.food_items,
+    body: details.join(' · '),
+    status: listing.status,
+    accent: active && minutes > 0 && minutes <= 30 ? 'var(--amber)' : 'var(--forest)',
+    steps: expired ? ['Expired'] : deliverySteps,
+    step: expired ? 0 : deliverySteps.findIndex((step) => step.toLowerCase() === listing.status),
+  };
+}
+
+const workspaceFeeds = {
+  donor: ['My listings', 'No surplus posted yet.'],
+  receiver: ['Listing offers', 'No offers for this account yet.'],
+  volunteer: ['Pickup jobs', 'No pickups assigned to this account yet.'],
+};
+
+function WorkspaceFeed({ role, accountId, revision = 0 }) {
+  const [listings, setListings] = useState(null);
   const [error, setError] = useState('');
-  const [revision, setRevision] = useState(0);
+  const [title, empty] = workspaceFeeds[role];
 
   useEffect(() => {
     const controller = new AbortController();
@@ -26,10 +71,12 @@ function DonorListings({ donorId, kgPerMeal }) {
       if (loading) return;
       loading = true;
       try {
-        const data = await readJson('/api/listings?donorId=' + donorId, { signal: controller.signal });
+        const data = role === 'donor'
+          ? await readJson('/api/listings?donorId=' + accountId, { signal: controller.signal })
+          : await readWorkspaceListings(role, accountId);
         if (controller.signal.aborted) return;
+        if (!data) throw new Error('Could not load ' + title.toLowerCase() + '.');
         setListings(data);
-        setLoaded(true);
         setError('');
       } catch (failure) {
         if (!controller.signal.aborted) setError(failure.message);
@@ -43,38 +90,30 @@ function DonorListings({ donorId, kgPerMeal }) {
       controller.abort();
       clearInterval(timer);
     };
-  }, [donorId, revision]);
+  }, [role, accountId, revision, title]);
 
   return (
-    <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+    <section className="min-w-0" aria-label={title}>
+      {error && <p className="error mb-3" role="alert">{error}</p>}
+      {listings ? (
+        <LiveNotificationFeed title={title} items={listings.slice().reverse().map(listingNotification)}
+          emptyMessage={empty} autoplay={false} height="420px" className="workspace-feed" />
+      ) : (
+        <div className="panel">
+          <h2>{title}</h2>
+          {!error && <p className="muted">Loading…</p>}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function DonorListings({ donorId, kgPerMeal }) {
+  const [revision, setRevision] = useState(0);
+  return (
+    <div className="workspace-grid">
       <PostForm donorId={donorId} kgPerMeal={kgPerMeal} onPosted={() => setRevision((value) => value + 1)} />
-      <section className="panel min-w-0" aria-labelledby="listings-title">
-        <h2 id="listings-title">My listings</h2>
-        {error && <p className="error" role="alert">{error}</p>}
-        {!loaded && !error && <p>Loading listings...</p>}
-        {loaded && !listings.length && <p>No surplus posted yet.</p>}
-        {listings.length > 0 && (
-          <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Listings table">
-            <table>
-              <thead><tr><th scope="col">Food</th><th scope="col">Quantity</th><th scope="col">Pickup by</th><th scope="col">Status</th></tr></thead>
-              <tbody>
-                {listings.map((listing) => (
-                  <tr key={listing.id}>
-                    <td>
-                      <strong>{listing.food_items}</strong><br />
-                      <small>{listing.veg ? 'Veg' : 'Non-veg'} · {storageLabels[listing.storage]}</small>
-                      {listing.allergens.length > 0 && <small className="block">Allergens: {listing.allergens.join(', ')}</small>}
-                    </td>
-                    <td>{listing.portions} portions<br /><small>{Number(listing.quantity_kg)} kg</small></td>
-                    <td><time dateTime={listing.pickup_by}>{formatDate(listing.pickup_by)}</time></td>
-                    <td><span className="status" data-status={listing.status}>{listing.status}</span></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+      <WorkspaceFeed role="donor" accountId={donorId} revision={revision} />
     </div>
   );
 }
@@ -181,16 +220,98 @@ function PostForm({ donorId, kgPerMeal, onPosted }) {
           <button type="submit" className="primary">{posting ? 'Posting...' : 'Post surplus'}</button>
         </fieldset>
         {error && <p className="error mt-3" role="alert">{error}</p>}
-        {notice && <p className="mt-3 text-green-800" role="status">{notice}</p>}
+        {notice && <p className="mt-3 notice" role="status">{notice}</p>}
       </form>
     </section>
+  );
+}
+
+const trustItems = [
+  [Clock3, 'Time-limited pickups', 'Every listing has a pickup-by countdown'],
+  [Tags, 'Allergen labels', 'Shown on every listing'],
+  [ShieldCheck, 'Synthetic data', 'No real addresses or people'],
+];
+
+const howItWorks = [
+  ['Post', 'Hostel messes share what’s left, how many portions are available and when to pick them up.'],
+  ['Match', 'Nearby shelters and community kitchens receive offers that fit their needs.'],
+  ['Deliver', 'Volunteers collect the food and bring it to the receiving kitchen.'],
+];
+
+function Landing({ onPost }) {
+  const [impact, setImpact] = useState(undefined);
+
+  useEffect(() => {
+    let active = true;
+    readImpact().then((data) => {
+      if (active) setImpact(data);
+    }).catch(() => {
+      if (active) setImpact(null);
+    });
+    return () => { active = false; };
+  }, []);
+
+  return (
+    <main>
+      <section className="hero" aria-labelledby="hero-title">
+        <div className="container hero-grid">
+          <div className="hero-copy">
+            <p className="eyebrow">Food rescue, hostel to shelter</p>
+            <h1 id="hero-title">Where surplus<br className="desktop-break" />{' '}finds <em>purpose</em>.</h1>
+            <p className="hero-description">Annapurna connects surplus food from hostel messes to nearby shelters and community kitchens before it spoils.</p>
+            <div className="hero-actions">
+              <button className="primary" onClick={onPost}>Post surplus</button>
+              <a className="secondary" href="#impact">See impact</a>
+            </div>
+            <dl id="impact" className="stats" aria-label="Annapurna impact" tabIndex={-1}>
+              {[[impact?.meals, 'Meals served'], [impact?.kg, 'Kg saved']].map(([value, label]) => (
+                <div key={label}>
+                  <dt>{label}</dt>
+                  <dd>{value == null ? '—' : Number(value).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</dd>
+                </div>
+              ))}
+            </dl>
+            {impact === null && <p className="muted mt-2" role="status">Impact totals are temporarily unavailable.</p>}
+          </div>
+          <div className="hero-feed">
+            <span className="feed-circle" aria-hidden="true" />
+            <Image className="feed-mark" src="/brand/logo-mark.png" width={120} height={120} alt="" />
+            <HomeLiveFeed />
+          </div>
+        </div>
+        <div className="gold-rule" aria-hidden="true" />
+      </section>
+      <section className="trust-strip" aria-label="Pickup information">
+        <ul className="container trust-grid">
+          {trustItems.map(([Icon, title, description]) => (
+            <li key={title}>
+              <Icon size={18} strokeWidth={1.5} aria-hidden="true" />
+              <div><strong>{title}</strong><p>{description}</p></div>
+            </li>
+          ))}
+        </ul>
+      </section>
+      <section className="container how-section" aria-labelledby="how-title">
+        <h2 id="how-title">How it <em>works</em>.</h2>
+        <ol className="steps-grid">
+          {howItWorks.map(([title, description], index) => (
+            <li key={title}>
+              <span className="step-number">{String(index + 1).padStart(2, '0')}</span>
+              <h3>{title}</h3><p>{description}</p>
+            </li>
+          ))}
+        </ol>
+      </section>
+    </main>
   );
 }
 
 export default function Home() {
   const [people, setPeople] = useState(null);
   const [selection, setSelection] = useState({ role: 'donor', id: null });
+  const [showWorkspace, setShowWorkspace] = useState(false);
   const [error, setError] = useState('');
+  const requestedRole = useRef(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -198,9 +319,12 @@ export default function Home() {
       if (controller.signal.aborted) return;
       let saved;
       try { saved = JSON.parse(localStorage.getItem(selectionKey)); } catch {}
-      const role = saved && Object.hasOwn(roles, saved.role) ? saved.role : 'donor';
-      const id = data[role].find((person) => person.id === saved?.id)?.id ?? data[role][0]?.id;
-      setSelection({ role, id });
+      setSelection((current) => {
+        if (current.id !== null) return current;
+        const savedRole = Object.hasOwn(roles, saved?.role) ? saved.role : current.role;
+        const role = requestedRole.current ?? savedRole;
+        return { role, id: data[role].find((person) => person.id === saved?.id)?.id ?? data[role][0]?.id };
+      });
       setPeople(data);
     }).catch((failure) => {
       if (!controller.signal.aborted) setError(failure.message);
@@ -208,48 +332,68 @@ export default function Home() {
     return () => controller.abort();
   }, []);
 
-  function changeSelection(role, id) {
-    const next = { role, id };
-    setSelection(next);
-    try { localStorage.setItem(selectionKey, JSON.stringify(next)); } catch {}
+  function openWorkspace(role, id) {
+    requestedRole.current = role;
+    if (people) {
+      const next = { role, id };
+      setSelection(next);
+      try { localStorage.setItem(selectionKey, JSON.stringify(next)); } catch {}
+    }
+    setShowWorkspace(true);
+    window.scrollTo(0, 0);
   }
 
   return (
     <>
       <header>
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-5 sm:px-8">
-          <div className="brand">Annapurna</div>
-          {people && (
-            <div className="grid w-full grid-cols-[minmax(0,1fr)_minmax(0,1.7fr)] gap-3 sm:w-auto">
-              <label>View as<select value={selection.role} onChange={(event) => {
-                const role = event.target.value;
-                changeSelection(role, people[role][0]?.id);
-              }}>
-                {Object.entries(roles).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-              </select></label>
-              <label>{roles[selection.role]} account<select value={selection.id ?? ''} onChange={(event) => changeSelection(selection.role, Number(event.target.value))}>
-                {people[selection.role].map(({ id, name }) => <option key={id} value={id}>{name}</option>)}
-              </select></label>
-            </div>
-          )}
+        <p className="announcement">Synthetic demo data · Annapurna does not certify food safety</p>
+        <div className="container masthead">
+          <a href="/" className="brand" onClick={(event) => {
+            if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+            event.preventDefault();
+            setShowWorkspace(false);
+            window.scrollTo(0, 0);
+          }}>
+            <Image src="/brand/logo-mark.png" width={40} height={40} alt="" />
+            <span>Annapurna{!showWorkspace && <small>Where surplus finds purpose.</small>}</span>
+          </a>
+          <div className="role-switcher">
+            <label>View as<select value={showWorkspace ? selection.role : ''} onChange={(event) => {
+              const role = event.target.value;
+              openWorkspace(role, role === selection.role ? selection.id : people[role][0]?.id);
+            }} disabled={!people}>
+              <option value="" disabled>Choose a role</option>
+              {Object.entries(roles).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select></label>
+            {people && (
+              <label>{showWorkspace ? roles[selection.role] : 'Demo'} account
+                <select value={selection.id ?? ''} onChange={(event) => openWorkspace(selection.role, Number(event.target.value))}>
+                  {people[selection.role].map(({ id, name }) => <option key={id} value={id}>{name}</option>)}
+                </select>
+              </label>
+            )}
+          </div>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-8">
-        <h1>{roles[selection.role]} workspace</h1>
-        {error && <p className="error" role="alert">{error}</p>}
-        {!people && !error && <p>Loading demo accounts...</p>}
-        {people && selection.role === 'donor' && selection.id && (
-          <DonorListings key={selection.id} donorId={selection.id} kgPerMeal={people.kgPerMeal} />
-        )}
-        {people && !selection.id && <p>No demo accounts are available for this role.</p>}
-        {people && selection.id && selection.role !== 'donor' && (
-          <section className="panel">
-            <h2>{people[selection.role].find((person) => person.id === selection.id)?.name}</h2>
-            <p>{selection.role === 'receiver' ? 'Listing offers' : 'Pickup jobs'} arrive in Milestone 2.</p>
-          </section>
-        )}
-      </main>
-      <footer className="mx-auto w-full max-w-6xl px-4 py-5 sm:px-8">Demo uses synthetic data. No real addresses or personal details.</footer>
+      {showWorkspace ? (
+        <main className="container workspace">
+          <h1>{roles[selection.role]} <em>workspace</em></h1>
+          {error && <p className="error" role="alert">{error}</p>}
+          {!people && !error && <p>Loading demo accounts…</p>}
+          {people && !selection.id && <p>No demo accounts are available for this role.</p>}
+          {people && selection.id && (selection.role === 'donor' ? (
+            <DonorListings key={selection.id} donorId={selection.id} kgPerMeal={people.kgPerMeal} />
+          ) : (
+            <>
+              <p className="eyebrow workspace-account">{people[selection.role].find((person) => person.id === selection.id)?.name}</p>
+              <WorkspaceFeed key={`${selection.role}-${selection.id}`} role={selection.role} accountId={selection.id} />
+            </>
+          ))}
+        </main>
+      ) : (
+        <Landing onPost={() => openWorkspace('donor', selection.role === 'donor' ? selection.id : people?.donor[0]?.id)} />
+      )}
+      <footer className="container site-footer">Demo uses synthetic data. No real addresses or personal details.</footer>
     </>
   );
 }

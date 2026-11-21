@@ -1,0 +1,83 @@
+# Annapurna — Design Guide (for the coding agent)
+
+Apply this look to every screen. Calm, editorial, lots of whitespace. Think "premium lifestyle store", applied to a food-rescue tool.
+
+## 1. Fonts (load with `next/font/google`, no CDN links)
+- **Headings:** Playfair Display (weights 400, 500, italic 400). Large, tight line-height (1.05–1.1), slight negative letter-spacing.
+- **Body / UI:** DM Sans (weights 400, 500, 600). 15–16px body, line-height 1.6.
+- **Accent word:** in each main heading, set ONE word in Playfair Display *italic* in the sage colour. Example: "Surplus food, *rescued* before it spoils."
+- **Eyebrow labels:** DM Sans, 11–12px, UPPERCASE, letter-spacing 0.18em, muted green, preceded by a small filled dot. Example: "● LIVE NEAR YOU".
+
+## 2. Colours (define as CSS variables in globals.css)
+| Token | Hex | Use |
+|---|---|---|
+| `--forest` | `#22392B` | Top bar, primary buttons, heading text |
+| `--forest-ink` | `#1C2A21` | Main text |
+| `--sage` | `#7A9A6A` | Italic accent words, eyebrow dots, active states |
+| `--cream` | `#ECEBE3` | Hero / section backgrounds |
+| `--paper` | `#F7F6F1` | Page background |
+| `--card` | `#FFFFFF` | Cards |
+| `--line` | `#E2E0D7` | Borders, dividers |
+| `--muted` | `#6E7468` | Secondary text |
+| `--gold` | `#C9973B` | Thin decorative rules, small icons, logo accents (from the logo) |
+| `--amber` | `#B7791F` | Warnings: "pickup soon", expiring countdown |
+| `--rust` | `#A94434` | Expired / errors only |
+
+No gradients, no drop shadows heavier than `0 1px 2px rgba(0,0,0,0.04)`.
+
+## 3. Layout
+- Max content width 1100px, centred, side padding 24px (16px on mobile).
+- Section spacing 64–96px desktop, 40px mobile.
+- **Announcement bar** at the very top: forest background, cream text, 12px uppercase, letter-spaced. Text: "SYNTHETIC DEMO DATA · ANNAPURNA DOES NOT CERTIFY FOOD SAFETY".
+- **Header:** paper background. Left: the logo mark `/brand/logo-mark.png` (circular, 40px, use `next/image`) followed by the wordmark "Annapurna" in Playfair Display 22px forest. Role switcher dropdowns on the right styled as minimal underlined selects.
+- **Logo files:** `public/brand/logo-mark.png` (circular emblem, transparent corners), `public/brand/logo-full.jpg` (full brand artwork, use only on the About/pitch section, never in the header). Favicon and app icons live in `app/favicon.ico`, `app/icon.png`, `app/apple-icon.png`.
+- **Tagline:** "Where surplus finds purpose." Use it under the wordmark on the home page and in the page `<title>` ("Annapurna · Where surplus finds purpose").
+
+## 4. Components
+- **Primary button:** forest background, white DM Sans 14px/500, square corners (radius 2px), padding 14px 22px, trailing "→" arrow. Hover: slightly lighter forest.
+- **Secondary button:** transparent, 1px forest border, same shape.
+- **Chips (food items, allergens, filters):** pill shape (radius 999px), 1px `--line` border, 13px text; selected = forest fill, white text.
+- **Cards:** white, 1px `--line` border, radius 4px, padding 24px. No heavy shadows.
+- **Status badge (top-left of a card):** tiny uppercase label, 10–11px, letter-spaced, square corners:
+  - POSTED: white bg, forest border · CLAIMED: sage bg, white · COLLECTED: forest bg, white · DELIVERED: cream bg, forest text · EXPIRED: rust bg, white.
+- **Stat pair:** big number in DM Sans 600 26–28px (e.g. "1,240"), small muted label under it ("Meals served"). Use in hero and impact dashboard.
+- **Trust strip:** a thin full-width band (paper bg, top and bottom `--line`) with 3 items, each a thin line icon + bold title + muted sub-line:
+  - "Time-limited pickups" / "Every listing has a pickup-by countdown"
+  - "Allergen labels" / "Shown on every listing"
+  - "Synthetic data" / "No real addresses or people"
+- **Inputs:** no boxes; bottom border only (1px `--line`), forest on focus. Labels as eyebrow style above.
+- **Match reason text:** muted DM Sans 13px with "·" separators, e.g. "2.1 km · fits your need of 60 · arrives 70 min early".
+- Icons: `lucide-react`, stroke width 1.5, 18px.
+
+## 5. Home page (`/`)
+Two-column hero on cream background (stacks on mobile):
+- Left: eyebrow "● FOOD RESCUE, HOSTEL TO SHELTER"; heading "Where surplus finds *purpose*." (italic word in sage); one muted sentence: "Annapurna connects surplus food from hostel messes to nearby shelters and community kitchens before it spoils."; primary button "Post surplus →" (goes to donor view) and secondary "See impact"; two stat pairs below (meals served, kg saved — read real numbers from the database).
+- Right: the animated live feed `components/home-live-feed.tsx` (see section 7), with the logo mark `/brand/logo-mark.png` at about 120px peeking from behind its top-right corner and a thin gold circle line behind both.
+- Then the trust strip, then a section "How it *works*." with three numbered steps: Post · Match · Deliver. Between hero and trust strip, a thin centred gold rule (like the logo's divider lines).
+
+## 6. Don'ts
+- Don't stretch, recolour or crop the logo mark further. Don't place it on dark backgrounds (it has a cream fill).
+- No stock photos of people or real places. No emojis in the UI. No bright reds/blues.
+- Don't change any data logic, API routes or the database while restyling.
+
+## 7. Live notification feed (`components/ui/live-notification-feed.tsx`)
+A ready-made animated feed component (TypeScript, Tailwind, shadcn-style colour tokens). It is already in the repo; do not rewrite it.
+
+**Setup (the project is JavaScript, so add TypeScript support alongside it):**
+1. `npm install -D typescript @types/react @types/node`. Next.js creates `tsconfig.json` on the next `npm run dev`. Existing `.js` files stay as they are.
+2. Make the `@/` import alias work: in `tsconfig.json` set `"baseUrl": "."` and `"paths": { "@/*": ["./*"] }`. If a `jsconfig.json` exists, move its settings into `tsconfig.json` and delete it.
+3. Do NOT run `npx shadcn init` or any shadcn CLI command: it would overwrite globals.css and the design.
+4. Map the shadcn colour tokens the component uses onto our palette in `app/globals.css`. For Tailwind v4 use `@theme inline` (for Tailwind v3, add the same names under `theme.extend.colors`):
+   - background → `--paper`, foreground → `--forest-ink`
+   - card → `#FFFFFF`, card-foreground → `--forest-ink`
+   - muted → `--cream`, muted-foreground → `--muted`
+   - border → `--line`, primary → `--forest`, ring → `--sage`
+5. The `components/ui/` folder is the standard place for reusable UI building blocks (shadcn convention). Keep it; future UI components go there too.
+
+**Where to use it:**
+- **Home hero** (`components/home-live-feed.tsx`): autoplaying demo with synthetic events. Already written; just place it.
+- **Receiver workspace:** show real offers as the feed with `autoplay={false}`. Each offer = `kind: "delivery"`, `steps: ["Posted","Claimed","Collected","Delivered"]`, `step` = current status index, `body` = match reason text, `actions: [{label:"Claim", done:"Claimed"}]`. In `onAction(id, "Claim")` call the existing claim API. Keep polling every 5 s and pass the updated list; new items animate in automatically.
+- **Donor workspace:** "My listings" as the same delivery feed (no actions), so donors watch status move.
+- **Volunteer workspace:** pickup jobs as delivery items with `actions: [{label:"Accept", done:"Accepted"}]`, then "Mark collected" / "Mark delivered".
+- Use only palette colours for `accent` (forest, sage, gold, amber). No bright blues, pinks or purples, and no blurred colour glows behind it.
+- The feed's rounded corners are allowed as the one exception to the square-corner rule.
