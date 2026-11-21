@@ -6,7 +6,7 @@ import HomeLiveFeed from '@/components/home-live-feed';
 import { LiveNotificationFeed } from '@/components/ui/live-notification-feed';
 import { readImpact, readWorkspaceListings } from './feed-data';
 import { useEffect, useRef, useState } from 'react';
-import { allergens, foods, storageLabels } from '../lib/listings';
+import { allergens, foods, maxPortions, storageLabels } from '../lib/listings';
 
 const roles = { donor: 'Donor', receiver: 'Receiver', volunteer: 'Volunteer' };
 const selectionKey = 'annapurna.selection';
@@ -269,7 +269,7 @@ function PostForm({ donorId, kgPerMeal, onPosted }) {
     }
     setPosting(true);
     try {
-      await readJson('/api/listings', {
+      const listing = await readJson('/api/listings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -280,7 +280,7 @@ function PostForm({ donorId, kgPerMeal, onPosted }) {
         }),
       });
       setForm(initialForm());
-      setNotice('Surplus posted.');
+      setNotice(listing.message ?? 'Surplus posted.');
       onPosted();
     } catch (failure) {
       setError(failure.message);
@@ -304,7 +304,7 @@ function PostForm({ donorId, kgPerMeal, onPosted }) {
               {Object.entries(storageLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select></label>
           </div>
-          <label>Portions<input type="number" min="1" max="2147483647" step="1" required value={form.portions}
+          <label>Portions<input type="number" min="1" max={maxPortions} step="1" required value={form.portions}
             onChange={(event) => update('portions', event.target.value)} />
             <small className="block">Estimated weight · <output aria-live="polite">{(Number(form.portions) * kgPerMeal).toLocaleString(undefined, { maximumFractionDigits: 3 })} kg</output></small>
           </label>

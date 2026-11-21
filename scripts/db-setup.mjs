@@ -9,11 +9,24 @@ if (!process.env.DATABASE_URL) {
   process.exit(1);
 }
 
-const client = new pg.Client({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-  connectionTimeoutMillis: 10000,
-});
+let client;
+try {
+  client = new pg.Client({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
+    connectionTimeoutMillis: 10000,
+  });
+} catch {
+  console.error('DATABASE_URL is invalid. Check the connection string in .env.local.');
+  process.exit(1);
+}
+
+const target = JSON.stringify(client.host);
+if (!process.argv.slice(2).includes('--force')) {
+  console.error(`Refusing to replace the Annapurna tables on database host ${target}. Run npm run db:setup -- --force to proceed.`);
+  process.exit(1);
+}
+console.log(`Replacing the six Annapurna tables and their data on database host ${target}.`);
 
 try {
   const [schema, seed] = await Promise.all([

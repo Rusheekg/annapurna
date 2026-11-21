@@ -1,6 +1,9 @@
 import { database } from '../../../lib/db';
-import { allergens, storageLabels, validId } from '../../../lib/listings';
+import { allergens, maxPortions, storageLabels, validId } from '../../../lib/listings';
 import { insertListingAndOffers } from '../../../lib/matching';
+
+const hour = 60 * 60 * 1000;
+const noMatchMessage = "Posted. No receiver can reach it in time yet; we'll keep offering it.";
 
 function invalid(error) {
   return Response.json({ error }, { status: 400 });
@@ -32,16 +35,21 @@ export async function POST(request) {
   const pickupTime = typeof pickupBy === 'string' ? Date.parse(pickupBy) : NaN;
   if (!validId(donorId)) return invalid('Choose a donor.');
   if (!foodItems || foodItems.length > 500) return invalid('Enter food items under 501 characters.');
-  if (!validId(portions)) return invalid('Enter a positive whole number of portions.');
+  if (!Number.isInteger(portions) || portions < 1 || portions > maxPortions) {
+    return invalid(`Enter a whole number of portions from 1 to ${maxPortions.toLocaleString('en-US')}.`);
+  }
   if (typeof veg !== 'boolean' || !Object.hasOwn(storageLabels, storage)) {
     return invalid('Choose a food type and storage method.');
   }
   if (!Array.isArray(body.allergens) || !body.allergens.every((item) => allergens.includes(item))) {
     return invalid('Choose recognized allergens.');
   }
-  if (!Number.isFinite(cookedTime) || !Number.isFinite(pickupTime) ||
-      pickupTime <= cookedTime || pickupTime <= Date.now()) {
-    return invalid('Pickup must be in the future and after cooking.');
+  const now = Date.now();
+  if (!Number.isFinite(cookedTime) || cookedTime > now || cookedTime < now - 12 * hour) {
+    return invalid('Cooked at must be a valid time within the past 12 hours and cannot be in the future.');
+  }
+  if (!Number.isFinite(pickupTime) || pickupTime <= now || pickupTime > now + 24 * hour) {
+    return invalid('Pickup by must be a valid future time within the next 24 hours.');
   }
 
   try {
@@ -53,7 +61,9 @@ export async function POST(request) {
     if (!rows.length) {
       return Response.json({ error: 'The donor, pickup window or matching settings are unavailable.' }, { status: 409 });
     }
-    return Response.json(rows[0], { status: 201 });
+    const listing = rows[0];
+    if (listing.offerCount === 0) listing.message = noMatchMessage;
+    return Response.json(listing, { status: 201 });
   } catch (error) {
     console.error('Could not post surplus:', error.message);
     return Response.json({ error: 'Could not post surplus.' }, { status: 500 });
