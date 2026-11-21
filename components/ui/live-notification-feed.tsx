@@ -15,6 +15,8 @@ interface NotificationBase {
   app: string;
   title: string;
   body?: string;
+  details?: string;
+  timeline?: { label: string; dateTime: string; text: string }[];
   /** Age label such as "4m". Items that land while the feed is open read "now". */
   time?: string;
   /** Brand color for the service tile and the live detail. Any CSS color. */
@@ -966,8 +968,16 @@ function NotificationCard({
                   {item.title}
                 </button>
                 {item.body && <p className="mt-0.5 text-[13px] leading-snug text-muted-foreground">{item.body}</p>}
+                {item.details && <p className="mt-1 text-[13px] leading-snug text-muted-foreground">{item.details}</p>}
                 <div className={cx("mt-2.5", accentClass)} style={accentScope}>
                   <Detail item={item} play={entry.play} delay={storyDelay} reduced={reduced} />
+                  {Boolean(item.timeline?.length) && (
+                    <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground" aria-label="Status timestamps">
+                      {item.timeline?.map(({ label, dateTime, text }) => (
+                        <li key={label}>{label} <time dateTime={dateTime}>{text}</time></li>
+                      ))}
+                    </ul>
+                  )}
                   {item.actions && item.actions.length > 0 && (
                     <div className="relative z-[1] mt-2.5 flex flex-wrap items-center gap-2">
                       {done ? (
@@ -1316,8 +1326,9 @@ export function LiveNotificationFeed({
                 }}
                 onAction={(action) => {
                   markRead(entry.id);
-                  setDone((prev) => ({ ...prev, [entry.id]: action.done ?? action.label }));
-                  handlers.current.onAction?.(entry.id, action.label);
+                  const handleAction = handlers.current.onAction;
+                  if (handleAction) handleAction(entry.id, action.label);
+                  else setDone((prev) => ({ ...prev, [entry.id]: action.done ?? action.label }));
                 }}
                 onDismiss={() => {
                   setEntries((prev) => prev.map((e) => (e.key === entry.key ? { ...e, leaving: true, leaveDelay: 0 } : e)));

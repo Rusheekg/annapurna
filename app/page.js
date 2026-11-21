@@ -19,15 +19,50 @@ async function readJson(url, options) {
 }
 
 const deliverySteps = ['Posted', 'Claimed', 'Collected', 'Delivered'];
+const timestampFields = ['created_at', 'claimed_at', 'collected_at', 'delivered_at'];
+const pickupGuidance = {
+  hot: 'Keep hot until handover',
+  room_temp: 'Serve within about 2 hours of cooking',
+  chilled: 'Keep chilled until handover',
+};
+const workspaceActions = {
+  Claim: { action: 'claim', change: (accountId) => ({ status: 'claimed', receiver_id: accountId }) },
+  'Request volunteer': { action: 'requestVolunteer', change: () => ({ pickup_method: 'volunteer' }) },
+  'We’ll collect ourselves': { action: 'collectOurselves', change: () => ({ pickup_method: 'self' }) },
+  Accept: { action: 'accept', change: (accountId) => ({ volunteer_id: accountId }) },
+  'Mark collected': { action: 'collect', change: () => ({ status: 'collected' }) },
+  'Mark delivered': { action: 'deliver', change: () => ({ status: 'delivered' }) },
+};
 
-function listingNotification(listing) {
+function actionsForListing(listing, role, accountId, pickupOpen) {
+  if (role === 'receiver') {
+    if (listing.status === 'posted' && pickupOpen) return [{ label: 'Claim', done: 'Claimed' }];
+    if (listing.receiver_id !== accountId) return [];
+    if (listing.status === 'claimed' && pickupOpen && !listing.pickup_method) {
+      return [{ label: 'Request volunteer' }, { label: 'We’ll collect ourselves' }];
+    }
+    if (listing.pickup_method !== 'self') return [];
+  } else if (role === 'volunteer') {
+    if (listing.status === 'claimed' && pickupOpen && !listing.volunteer_id) {
+      return [{ label: 'Accept', done: 'Accepted' }];
+    }
+    if (listing.volunteer_id !== accountId) return [];
+  } else {
+    return [];
+  }
+
+  if (listing.status === 'claimed' && pickupOpen) return [{ label: 'Mark collected' }];
+  if (listing.status === 'collected') return [{ label: 'Mark delivered' }];
+  return [];
+}
+
+function listingNotification(listing, role, accountId, pending) {
   const expired = listing.status === 'expired';
   const pickup = new Date(listing.pickup_by);
   const minutes = Math.ceil((pickup.getTime() - Date.now()) / 60000);
   const active = listing.status === 'posted' || listing.status === 'claimed';
-  const pickupLabel = active && minutes > 0
-    ? `Pickup by ${formatDate(pickup)} (${minutes} min left)`
-    : `Pickup by ${formatDate(pickup)}`;
+  const pickupLabel = `Pickup by ${formatDate(pickup)}` +
+    (active ? minutes > 0 ? ` (${minutes} min left)` : ' (window closed)' : '');
   const details = [
     `${listing.portions} portions`,
     `${Number(listing.quantity_kg)} kg`,
@@ -36,8 +71,26 @@ function listingNotification(listing) {
     `Allergens: ${listing.allergens.join(', ') || 'None listed'}`,
     pickupLabel,
   ];
-  if (listing.daily_need_meals && listing.portions <= listing.daily_need_meals) {
-    details.unshift(`Fits your need of ${listing.daily_need_meals}`);
+  if (role === 'receiver') {
+    details.push(pickupGuidance[listing.storage]);
+    if (listing.pickup_method === 'volunteer') {
+      details.push(listing.volunteer_id ? 'Volunteer assigned' : 'Volunteer requested');
+    }
+    if (listing.pickup_method === 'self') details.push('Self pickup');
+  }
+  if (role === 'volunteer') {
+    details.unshift(`${Number(listing.pickup_distance_km).toFixed(1)} km to pickup`,
+      `Deliver to ${listing.receiver_name}`);
+    if (listing.status === 'claimed' && listing.volunteer_id === accountId) details.push('Accepted');
+  }
+  if (pending) details.push('Saving…');
+
+  const timeline = deliverySteps.flatMap((label, index) => {
+    const value = listing[timestampFields[index]];
+    return value ? [{ label, dateTime: new Date(value).toISOString(), text: formatDate(value) }] : [];
+  });
+  if (expired && listing.expired_at) {
+    timeline.push({ label: 'Expired', dateTime: new Date(listing.expired_at).toISOString(), text: formatDate(listing.expired_at) });
   }
 
   return {
@@ -45,7 +98,10 @@ function listingNotification(listing) {
     kind: 'delivery',
     app: listing.donor_name || 'Annapurna',
     title: listing.food_items,
-    body: details.join(' · '),
+    body: listing.match_reason || details.join(' · '),
+    details: listing.match_reason ? details.join(' · ') : undefined,
+    timeline,
+    actions: pending ? [] : actionsForListing(listing, role, accountId, minutes > 0),
     status: listing.status,
     accent: active && minutes > 0 && minutes <= 30 ? 'var(--amber)' : 'var(--forest)',
     steps: expired ? ['Expired'] : deliverySteps,
@@ -56,12 +112,16 @@ function listingNotification(listing) {
 const workspaceFeeds = {
   donor: ['My listings', 'No surplus posted yet.'],
   receiver: ['Listing offers', 'No offers for this account yet.'],
-  volunteer: ['Pickup jobs', 'No pickups assigned to this account yet.'],
+  volunteer: ['Pickup jobs', 'No pickup jobs are available for this account.'],
 };
 
 function WorkspaceFeed({ role, accountId, revision = 0 }) {
   const [listings, setListings] = useState(null);
   const [error, setError] = useState('');
+  const [actionErrors, setActionErrors] = useState({});
+  const [optimistic, setOptimistic] = useState({});
+  const inFlight = useRef(new Set());
+  const writeVersion = useRef(0);
   const [title, empty] = workspaceFeeds[role];
 
   useEffect(() => {
@@ -70,16 +130,17 @@ function WorkspaceFeed({ role, accountId, revision = 0 }) {
     async function refresh() {
       if (loading) return;
       loading = true;
+      const version = writeVersion.current;
       try {
         const data = role === 'donor'
           ? await readJson('/api/listings?donorId=' + accountId, { signal: controller.signal })
           : await readWorkspaceListings(role, accountId);
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted || version !== writeVersion.current) return;
         if (!data) throw new Error('Could not load ' + title.toLowerCase() + '.');
         setListings(data);
         setError('');
       } catch (failure) {
-        if (!controller.signal.aborted) setError(failure.message);
+        if (!controller.signal.aborted && version === writeVersion.current) setError(failure.message);
       } finally {
         loading = false;
       }
@@ -92,11 +153,46 @@ function WorkspaceFeed({ role, accountId, revision = 0 }) {
     };
   }, [role, accountId, revision, title]);
 
+  async function act(id, label) {
+    const { action, change } = workspaceActions[label];
+    if (inFlight.current.has(id)) return;
+    inFlight.current.add(id);
+    writeVersion.current += 1;
+    setOptimistic((previous) => ({ ...previous, [id]: change(accountId) }));
+    setActionErrors((previous) => ({ ...previous, [id]: '' }));
+
+    try {
+      const listing = await readJson('/api/listings/transition', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, listingId: Number(id), accountId, role }),
+      });
+      setListings((previous) => previous.map((item) => item.id === listing.id ? { ...item, ...listing } : item));
+    } catch (failure) {
+      setActionErrors((previous) => ({
+        ...previous,
+        [id]: `Could not complete “${label}”. ${failure.message}`,
+      }));
+    } finally {
+      writeVersion.current += 1;
+      inFlight.current.delete(id);
+      setOptimistic(({ [id]: pending, ...others }) => others);
+    }
+  }
+
   return (
     <section className="min-w-0" aria-label={title}>
       {error && <p className="error mb-3" role="alert">{error}</p>}
+      {Object.entries(actionErrors).map(([id, message]) => message && (
+        <p key={id} className="error mb-3" role="alert">{message}</p>
+      ))}
       {listings ? (
-        <LiveNotificationFeed title={title} items={listings.slice().reverse().map(listingNotification)}
+        <LiveNotificationFeed title={title}
+          items={listings.slice().reverse().map((listing) => {
+            const pending = optimistic[listing.id];
+            return listingNotification({ ...listing, ...pending }, role, accountId, Boolean(pending));
+          })}
+          onAction={act}
           emptyMessage={empty} autoplay={false} height="420px" className="workspace-feed" />
       ) : (
         <div className="panel">

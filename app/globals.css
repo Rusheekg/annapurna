@@ -211,3 +211,9 @@ button:disabled { cursor: wait; }
   .desktop-break { display: none; }
   .how-section, .workspace { padding-block: 40px; }
 }
+
+@media (width < 640px) {
+  button, .chip, .secondary { min-height: 44px; }
+  button[data-dismiss] { min-width: 44px; }
+  button[data-dismiss]:focus-visible { opacity: 1; }
+}

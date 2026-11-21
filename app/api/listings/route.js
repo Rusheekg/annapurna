@@ -1,9 +1,6 @@
 import { database } from '../../../lib/db';
-import { allergens, storageLabels } from '../../../lib/listings';
-
-function validId(value) {
-  return Number.isInteger(value) && value > 0 && value <= 2147483647;
-}
+import { allergens, storageLabels, validId } from '../../../lib/listings';
+import { insertListingAndOffers } from '../../../lib/matching';
 
 function invalid(error) {
   return Response.json({ error }, { status: 400 });
@@ -49,17 +46,12 @@ export async function POST(request) {
 
   try {
     const { rows } = await database().query(
-      `INSERT INTO public.listings
-        (donor_id, food_items, veg, portions, quantity_kg, storage, allergens, cooked_at, pickup_by)
-       SELECT d.id, $2, $3, $4::int, $4::int * s.value, $5, $6, $7, $8
-       FROM public.donors d CROSS JOIN public.settings s
-       WHERE d.id = $1 AND s.key = 'kg_per_meal'
-       RETURNING *`,
+      insertListingAndOffers,
       [donorId, foodItems, veg, portions, storage, [...new Set(body.allergens)],
         new Date(cookedTime).toISOString(), new Date(pickupTime).toISOString()],
     );
     if (!rows.length) {
-      return Response.json({ error: 'Donor or meal-weight setting unavailable.' }, { status: 404 });
+      return Response.json({ error: 'The donor, pickup window or matching settings are unavailable.' }, { status: 409 });
     }
     return Response.json(rows[0], { status: 201 });
   } catch (error) {

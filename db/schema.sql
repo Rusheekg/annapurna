@@ -42,6 +42,7 @@ CREATE TABLE public.listings (
     CHECK (status IN ('posted', 'claimed', 'collected', 'delivered', 'expired')),
   receiver_id integer REFERENCES public.receivers(id),
   volunteer_id integer REFERENCES public.volunteers(id),
+  pickup_method text CHECK (pickup_method IN ('volunteer', 'self')),
   created_at timestamptz NOT NULL DEFAULT now(),
   claimed_at timestamptz,
   collected_at timestamptz,
@@ -56,6 +57,7 @@ CREATE TABLE public.notifications (
   listing_id integer NOT NULL REFERENCES public.listings(id),
   receiver_id integer NOT NULL REFERENCES public.receivers(id),
   round integer NOT NULL CHECK (round > 0),
+  match_reason text,
   created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (listing_id, receiver_id)
 );
