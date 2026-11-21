@@ -1,0 +1,106 @@
+@import "tailwindcss";
+
+body {
+  display: flex;
+  min-height: 100dvh;
+  flex-direction: column;
+  background: #f5f4ed;
+  color: #1d3025;
+  font-family: system-ui, sans-serif;
+}
+header {
+  background: #193a2a;
+  color: #fffdf2;
+}
+.brand {
+  font-family: Georgia, serif;
+  font-size: 2rem;
+  font-weight: bold;
+}
+h1, h2 {
+  font-family: Georgia, serif;
+  font-weight: bold;
+}
+h1 {
+  margin-bottom: 1.4rem;
+  font-size: clamp(1.9rem, 5vw, 3rem);
+}
+h2 {
+  margin-bottom: 1rem;
+  font-size: 1.6rem;
+}
+.panel {
+  border: 1px solid #dbdfd3;
+  border-radius: 1rem;
+  background: #fffef9;
+  padding: clamp(1rem, 3vw, 1.6rem);
+}
+label, legend {
+  font-weight: 650;
+  font-size: .88rem;
+}
+legend { margin-bottom: .4rem; }
+input, select {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 2.65rem;
+  margin-top: .3rem;
+  border: 1px solid #aab6a9;
+  border-radius: .5rem;
+  background: #fff;
+  padding: .45rem .6rem;
+  color: #1d3025;
+  font-size: 1rem;
+  font-weight: 400;
+}
+:focus-visible {
+  outline: 2px solid #bd6228;
+  outline-offset: 3px;
+}
+button { cursor: pointer; }
+button:disabled { cursor: wait; }
+.chip {
+  border: 1px solid #aab6a9;
+  border-radius: 2rem;
+  padding: .42rem .8rem;
+  font-size: .87rem;
+}
+.chip[aria-pressed="true"], .primary {
+  border-color: #24543c;
+  background: #24543c;
+  color: white;
+}
+.primary {
+  min-height: 2.8rem;
+  border-radius: .55rem;
+  padding: .55rem 1rem;
+  font-weight: 700;
+}
+table {
+  width: 100%;
+  min-width: 25rem;
+  text-align: left;
+  font-size: .9rem;
+}
+th, td {
+  border-bottom: 1px solid #e1e5d9;
+  padding: .7rem .55rem;
+  vertical-align: top;
+}
+th { background: #eef1e8; }
+small, footer { color: #526256; }
+.status {
+  display: inline-block;
+  border-radius: 2rem;
+  background: #e4efe2;
+  padding: .13rem .5rem;
+  font-size: .8rem;
+  font-weight: 650;
+  text-transform: capitalize;
+}
+.status[data-status="expired"] {
+  background: #fae9df;
+  color: #8b3c26;
+}
+.error { color: #a13a25; }
