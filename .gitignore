@@ -160,3 +160,5 @@ vite.config.ts.timestamp-*
 .env.local
 
 .claude/settings.local.json
+
+.playwright-mcp/
