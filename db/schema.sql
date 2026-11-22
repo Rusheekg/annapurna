@@ -1,4 +1,4 @@
-DROP TABLE IF EXISTS public.auth_write_limits, public.user_roles, public.profiles, public.notifications, public.listings, public.settings,
+DROP TABLE IF EXISTS public.auth_login_attempts, public.auth_write_limits, public.user_roles, public.profiles, public.notifications, public.listings, public.settings,
   public.volunteers, public.receivers, public.donors;
 
 CREATE TABLE public.donors (
@@ -111,3 +111,13 @@ REVOKE ALL ON public.user_roles FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON public.user_roles TO authenticated;
 CREATE POLICY read_own_roles ON public.user_roles
   FOR SELECT TO authenticated USING ((SELECT auth.uid()) = user_id);
+
+CREATE TABLE public.auth_login_attempts (
+  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  email text NOT NULL CHECK (email = lower(email) AND char_length(email) <= 254),
+  kind text NOT NULL CHECK (kind IN ('login_fail', 'login_lock', 'reset_request', 'reset_wrong_code')),
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX auth_login_attempts_lookup ON public.auth_login_attempts (email, kind, created_at DESC);
+ALTER TABLE public.auth_login_attempts ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.auth_login_attempts FROM PUBLIC, anon, authenticated;

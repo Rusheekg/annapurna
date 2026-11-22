@@ -399,3 +399,16 @@ button:disabled { cursor: wait; }
   .metric-stat dd { font-size: 25px; }
   .settings-save { width: 100%; }
 }
+
+.password-field { position: relative; }
+.password-field input { padding-right: 48px; }
+.password-toggle {
+  position: absolute; top: 0; right: 0; display: grid; place-items: center;
+  width: 44px; height: 44px; color: var(--forest);
+}
+.password-toggle:hover { background: var(--cream); }
+.auth-links { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 4px; font-size: 14px; }
+.auth-links a { display: inline-flex; align-items: center; min-height: 44px; color: var(--forest); text-decoration: underline; text-underline-offset: 4px; }
+.field-error { margin-top: 4px; font-size: 13px; }
+@media (max-width: 640px) { input { min-height: 44px; } }
+.auth-inline { color: var(--forest); text-decoration: underline; text-underline-offset: 4px; }
