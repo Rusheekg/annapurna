@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 const fields = [
@@ -9,6 +10,7 @@ const fields = [
 ];
 
 export default function SettingsForm({ initialValues }) {
+  const router = useRouter();
   const [values, setValues] = useState(initialValues);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -30,6 +32,7 @@ export default function SettingsForm({ initialValues }) {
       if (!response.ok) throw new Error(data.error);
       setValues(data);
       setNotice('Assumptions saved.');
+      router.refresh();
     } catch (failure) {
       setError(failure.message || 'Could not save assumptions. Try again.');
     } finally {
