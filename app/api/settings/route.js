@@ -1,11 +1,14 @@
 import { database } from '@/lib/db';
 import { settingKeys, settingsFromRows } from '@/lib/settings';
+import { errorResponse, serverFailure } from '@/lib/api-errors';
+import { invalidField } from '@/lib/request-errors';
 
 export async function PATCH(request) {
   const body = await request.json().catch(() => null);
   const values = settingKeys.map((key) => body?.[key]);
-  if (!values.every((value) => Number.isFinite(value) && value > 0)) {
-    return Response.json({ error: 'Enter a positive number for each assumption.' }, { status: 400 });
+  const invalidIndex = values.findIndex((value) => !Number.isFinite(value) || value <= 0);
+  if (invalidIndex !== -1) {
+    return errorResponse(400, invalidField(settingKeys[invalidIndex], 'Enter a number greater than zero.'));
   }
 
   try {
@@ -18,7 +21,6 @@ export async function PATCH(request) {
     );
     return Response.json(settingsFromRows(rows));
   } catch (error) {
-    console.error('Could not save assumptions:', error.message);
-    return Response.json({ error: 'Could not save assumptions. Try again.' }, { status: 500 });
+    return errorResponse(503, serverFailure('Save assumptions', error, true));
   }
 }

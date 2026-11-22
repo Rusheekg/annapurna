@@ -1,4 +1,6 @@
-import SiteHeader from '@/components/site-header';
+import { SettingsFrame } from '@/components/impact-settings-frames';
+import RouteFeedback from '@/components/route-feedback';
+import { serverFailure } from '@/lib/api-errors';
 import { readSettings } from '@/lib/settings';
 import SettingsForm from './settings-form';
 
@@ -6,22 +8,11 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Settings · Annapurna' };
 
 export default async function SettingsPage() {
-  let settings;
+  let content;
   try {
-    settings = await readSettings();
+    content = <SettingsForm initialValues={await readSettings()} />;
   } catch (error) {
-    console.error('Could not load assumptions:', error.message);
+    content = <RouteFeedback error={serverFailure('Load assumptions', error)} />;
   }
-
-  return (
-    <>
-      <SiteHeader page="settings" />
-      <main className="container workspace">
-        <p className="eyebrow mb-3">Settings</p>
-        <h1>Impact <em>assumptions</em>.</h1>
-        {settings ? <SettingsForm initialValues={settings} /> :
-          <p role="status">Assumptions are temporarily unavailable. Reload to try again.</p>}
-      </main>
-    </>
-  );
+  return <SettingsFrame>{content}</SettingsFrame>;
 }

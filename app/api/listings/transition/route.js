@@ -1,6 +1,8 @@
 import { database } from '@/lib/db';
 import { validId } from '@/lib/listings';
 import { distanceKm, volunteerPickupRadiusKm } from '@/lib/matching';
+import { errorResponse, serverFailure } from '@/lib/api-errors';
+import { expiredMessage, invalidField, missingAccount, missingListing } from '@/lib/request-errors';
 
 const transitions = {
   claim: {
@@ -8,7 +10,7 @@ const transitions = {
     where: `l.status = 'posted' AND l.pickup_by > now() AND EXISTS (
       SELECT 1 FROM public.notifications n WHERE n.listing_id = l.id AND n.receiver_id = $2
     )`,
-    conflict: 'This offer has already been claimed, is no longer available, or was not offered to this account.',
+    conflict: 'This offer is no longer available to your account. Check your other offers.',
   },
   requestVolunteer: {
     set: "pickup_method = 'volunteer', volunteer_requested_at = now()",
@@ -55,7 +57,7 @@ export async function PATCH(request) {
     ? typeof role === 'string' && Object.hasOwn(handoverOwner, role)
     : role === (action === 'accept' ? 'volunteer' : 'receiver');
   if (!transition || !allowed || !validId(listingId) || !validId(accountId)) {
-    return Response.json({ error: 'Choose a valid listing, account and action.' }, { status: 400 });
+    return errorResponse(400, invalidField(null, 'Choose a valid listing, account and action.'));
   }
 
   try {
@@ -65,10 +67,28 @@ export async function PATCH(request) {
        WHERE l.id = $1 AND ${transition.where}${owner} RETURNING l.*`,
       [listingId, accountId],
     );
-    if (!rows.length) return Response.json({ error: transition.conflict }, { status: 409 });
+    if (!rows.length) {
+      const accounts = role === 'receiver' ? 'receivers' : 'volunteers';
+      const { rows: [listing] } = await database().query(
+        `SELECT status, receiver_id, pickup_by <= now() AS deadline_passed,
+           EXISTS (SELECT 1 FROM public.${accounts} WHERE id = $2) AS account_exists
+         FROM public.listings WHERE id = $1`, [listingId, accountId],
+      );
+      if (!listing) return errorResponse(404, missingListing);
+      if (!listing.account_exists) return errorResponse(404, missingAccount);
+      if (listing.status === 'expired' || (listing.deadline_passed && ['posted', 'claimed'].includes(listing.status))) {
+        return errorResponse(409, { code: 'EXPIRED', message: expiredMessage });
+      }
+      if (action === 'claim' && listing.receiver_id && listing.receiver_id !== accountId) {
+        return errorResponse(409, { code: 'CLAIM_CONFLICT', message: "Another kitchen claimed this a moment ago. It's no longer available." });
+      }
+      if (action === 'claim' && listing.receiver_id === accountId) {
+        return errorResponse(409, { code: 'CONFLICT', message: 'You already claimed this offer. Check your listing offers.' });
+      }
+      return errorResponse(409, { code: 'CONFLICT', message: transition.conflict });
+    }
     return Response.json(rows[0]);
   } catch (error) {
-    console.error('Could not update listing:', error.message);
-    return Response.json({ error: 'The listing could not be updated. Please try again.' }, { status: 500 });
+    return errorResponse(503, serverFailure('Update listing', error, true));
   }
 }

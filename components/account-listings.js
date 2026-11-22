@@ -3,13 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { readWorkspaceListings } from '@/app/feed-data';
 import { handlingGuidance, minutesUntil, safetyNotice, storageLabels } from '@/lib/listings';
-
-export async function readJson(url, options) {
-  const response = await fetch(url, options);
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'Request failed.');
-  return data;
-}
+import { networkError, readJson } from '@/lib/client-requests';
 
 const deliverySteps = ['Posted', 'Claimed', 'Collected', 'Delivered'];
 const timestampFields = ['created_at', 'claimed_at', 'collected_at', 'delivered_at'];
@@ -20,6 +14,15 @@ const workspaceActions = {
   Accept: { action: 'accept', change: (accountId) => ({ volunteer_id: accountId }) },
   'Mark collected': { action: 'collect', change: () => ({ status: 'collected' }) },
   'Mark delivered': { action: 'deliver', change: () => ({ status: 'delivered' }) },
+};
+
+const pendingLabels = {
+  Claim: 'Claiming…',
+  'Request volunteer': 'Requesting…',
+  'We’ll collect ourselves': 'Saving…',
+  Accept: 'Accepting…',
+  'Mark collected': 'Marking collected…',
+  'Mark delivered': 'Marking delivered…',
 };
 
 function actionsForListing(listing, role, accountId, pickupOpen) {
@@ -71,7 +74,6 @@ export function listingNotification(listing, role, accountId, pending) {
       `Deliver to ${listing.receiver_name}`);
     if (listing.status === 'claimed' && listing.volunteer_id === accountId) details.push('Accepted');
   }
-  if (pending) details.push('Saving…');
 
   const timeline = deliverySteps.flatMap((label, index) => {
     const value = listing[timestampFields[index]];
@@ -93,7 +95,11 @@ export function listingNotification(listing, role, accountId, pending) {
     priority: role === 'volunteer' && listing.priority_pickup && !listing.volunteer_id && listing.status === 'claimed'
       ? 'Priority pickup' : undefined,
     timeline,
-    actions: pending ? [] : actionsForListing(listing, role, accountId, minutes > 0),
+    actions: pending ? pending.actions.map((action) => ({
+      ...action,
+      disabled: true,
+      pendingText: action.label === pending.label ? pendingLabels[pending.label] : undefined,
+    })) : actionsForListing(listing, role, accountId, minutes > 0),
     status: listing.status,
     accent: active && minutes > 0 && minutes <= 30 ? 'var(--amber)' : 'var(--forest)',
     steps: expired ? ['Expired'] : deliverySteps,
@@ -112,16 +118,17 @@ export function useAccountListings(role, accountId, revision = 0) {
   const [error, setError] = useState('');
   const [actionErrors, setActionErrors] = useState({});
   const [optimistic, setOptimistic] = useState({});
+  const [refreshVersion, refresh] = useState(0);
   const inFlight = useRef(new Set());
+  const hasLoaded = useRef(false);
   const writeVersion = useRef(0);
-  const [title, empty] = workspaceFeeds[role];
 
   useEffect(() => {
     if (!accountId) return;
     const controller = new AbortController();
     let loading = false;
     async function refresh() {
-      if (loading) return;
+      if (loading || !navigator.onLine) return;
       loading = true;
       const version = writeVersion.current;
       try {
@@ -129,30 +136,43 @@ export function useAccountListings(role, accountId, revision = 0) {
           ? await readJson('/api/listings?donorId=' + accountId, { signal: controller.signal })
           : await readWorkspaceListings(role, accountId);
         if (controller.signal.aborted || version !== writeVersion.current) return;
-        if (!data) throw new Error('Could not load ' + title.toLowerCase() + '.');
+        if (data?.error) throw data.error;
+        if (!data) throw networkError();
+        hasLoaded.current = true;
         setListings(data);
         setError('');
       } catch (failure) {
-        if (!controller.signal.aborted && version === writeVersion.current) setError(failure.message);
+        if (!controller.signal.aborted && version === writeVersion.current && navigator.onLine &&
+            (!hasLoaded.current || failure.code === 'NOT_FOUND')) {
+          setError(failure.code ? failure : networkError());
+        }
       } finally {
         loading = false;
       }
     }
     refresh();
     const timer = setInterval(refresh, 5000);
+    window.addEventListener('online', refresh);
     return () => {
       controller.abort();
       clearInterval(timer);
+      window.removeEventListener('online', refresh);
     };
-  }, [role, accountId, revision, title]);
+  }, [role, accountId, revision, refreshVersion]);
 
   async function act(id, label) {
     const { action, change } = workspaceActions[label];
     if (inFlight.current.has(id)) return;
     inFlight.current.add(id);
     writeVersion.current += 1;
-    setOptimistic((previous) => ({ ...previous, [id]: change(accountId) }));
-    setActionErrors((previous) => ({ ...previous, [id]: '' }));
+    const current = listings?.find((item) => String(item.id) === id);
+    if (current) {
+      setOptimistic((previous) => ({
+        ...previous,
+        [id]: { change: change(accountId), label, actions: actionsForListing(current, role, accountId, true) },
+      }));
+    }
+    setActionErrors(({ [id]: previousError, ...remaining }) => remaining);
 
     try {
       const listing = await readJson('/api/listings/transition', {
@@ -165,7 +185,7 @@ export function useAccountListings(role, accountId, revision = 0) {
     } catch (failure) {
       setActionErrors((previous) => ({
         ...previous,
-        [id]: `Could not complete “${label}”. ${failure.message}`,
+        [id]: { error: failure.code ? failure : networkError(true), label },
       }));
     } finally {
       writeVersion.current += 1;
@@ -174,7 +194,7 @@ export function useAccountListings(role, accountId, revision = 0) {
     }
   }
 
-  return { listings, error, actionErrors, optimistic, act };
+  return { listings, error, actionErrors, optimistic, act, retry: () => refresh((value) => value + 1) };
 }
 
 function formatDate(value) {

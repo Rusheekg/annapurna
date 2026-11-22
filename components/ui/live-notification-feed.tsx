@@ -2,11 +2,14 @@
 // Live notification feed component by the CCgather team (via 21st.dev). Colours come from the app theme tokens in globals.css.
 
 import * as React from "react";
+import { Pending } from "@/components/request-feedback";
 
 export interface NotificationAction {
   label: string;
   /** Shown in place of the buttons once this action is picked, e.g. "Accepted". */
   done?: string;
+  disabled?: boolean;
+  pendingText?: string;
 }
 
 interface NotificationBase {
@@ -1001,16 +1004,17 @@ function NotificationCard({
                             key={action.label}
                             type="button"
                             data-action={action.label}
+                            disabled={action.disabled}
                             onClick={(event) => {
                               event.stopPropagation();
                               onAction(action);
                             }}
                             className={cx(
-                              "h-7 rounded-full px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                              "inline-flex h-7 items-center gap-2 rounded-full px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-70",
                               i === 0 ? "bg-foreground text-background hover:bg-foreground/85" : "border border-border bg-background text-foreground hover:bg-muted",
                             )}
                           >
-                            {action.label}
+                            {action.pendingText ? <Pending>{action.pendingText}</Pending> : action.label}
                           </button>
                         ))
                       )}

@@ -5,6 +5,8 @@ import { validId } from '../lib/listings';
 import { distanceKm, volunteerPickupRadiusKm } from '../lib/matching';
 import { runEscalation } from '../lib/escalation';
 import { settingKeys, settingsFromRows } from '../lib/settings';
+import { serverFailure } from '@/lib/api-errors';
+import { missingAccount } from '@/lib/request-errors';
 
 export async function readImpact() {
   try {
@@ -40,13 +42,12 @@ export async function readImpact() {
     );
     return { ...rows[0], settings: settingsFromRows(rows[0].settings) };
   } catch (error) {
-    console.error('Could not load impact:', error.message);
-    return null;
+    return { error: serverFailure('Load impact', error) };
   }
 }
 
 export async function readWorkspaceListings(role, accountId) {
-  if (!validId(accountId)) return null;
+  if (!validId(accountId)) return { error: missingAccount };
 
   const query = role === 'receiver' ? `
     SELECT l.*, d.name AS donor_name, n.match_reason
@@ -74,20 +75,23 @@ export async function readWorkspaceListings(role, accountId) {
       WHEN l.status IN ('claimed', 'collected') THEN 1 ELSE 2 END,
       pickup_distance_km, l.created_at DESC, l.id DESC
   ` : null;
-  if (!query) return null;
+  if (!query) return { error: missingAccount };
 
   try {
     await runEscalation();
+    const accounts = role === 'receiver' ? 'receivers' : 'volunteers';
+    if (!(await database().query(`SELECT 1 FROM public.${accounts} WHERE id = $1`, [accountId])).rows.length) {
+      return { error: missingAccount };
+    }
     const { rows } = await database().query(query, [accountId]);
     return rows;
   } catch (error) {
-    console.error('Could not load workspace listings:', error.message);
-    return null;
+    return { error: serverFailure('Load workspace listings', error) };
   }
 }
 
 export async function readMapData(volunteerId) {
-  if (volunteerId !== null && !validId(volunteerId)) return null;
+  if (volunteerId !== null && !validId(volunteerId)) return { error: missingAccount };
 
   try {
     const { rows: [data] } = await database().query(`
@@ -119,7 +123,6 @@ export async function readMapData(volunteerId) {
     `, [volunteerId]);
     return data;
   } catch (error) {
-    console.error('Could not load neighbourhood map:', error.message);
-    return null;
+    return { error: serverFailure('Load neighbourhood map', error) };
   }
 }

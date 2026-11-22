@@ -3,8 +3,10 @@
 import { Bell, X } from 'lucide-react';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { validId } from '@/lib/listings';
-import { listingNotification, readJson, useAccountListings } from './account-listings';
+import { listingNotification, useAccountListings } from './account-listings';
+import { readJson } from '@/lib/client-requests';
 import { LiveNotificationFeed } from './ui/live-notification-feed';
+import { FeedSkeleton, RequestError } from './request-feedback';
 
 export const selectionKey = 'annapurna.selection';
 const roles = ['donor', 'receiver', 'volunteer'];
@@ -33,7 +35,7 @@ export default function NotificationBell({ role, accountId, listingsState, loadi
   const icon = useRef(null);
   const seen = useRef(null);
   const latestReadIds = useRef(readIds);
-  const { listings, error, actionErrors, optimistic, act } = listingsState;
+  const { listings, error, actionErrors, optimistic, act, retry } = listingsState;
 
   const items = useMemo(() => {
     if (!listings) return [];
@@ -47,7 +49,7 @@ export default function NotificationBell({ role, accountId, listingsState, loadi
     else visible.reverse();
     return visible.map((listing) => {
       const pending = optimistic[listing.id];
-      const item = listingNotification({ ...listing, ...pending }, role, accountId, Boolean(pending));
+      const item = listingNotification({ ...listing, ...pending?.change }, role, accountId, pending);
       if (role === 'donor') item.id = `${listing.id}:${listing.status}`;
       return item;
     });
@@ -107,6 +109,12 @@ export default function NotificationBell({ role, accountId, listingsState, loadi
     }
   }
 
+  const closeControl = (
+    <button type="button" ref={closeButton} className="notification-close" aria-label="Close notifications" onClick={close}>
+      <X size={18} strokeWidth={1.5} aria-hidden="true" />
+    </button>
+  );
+
   return (
     <div className="notification-bell" ref={root}>
       <button type="button" ref={trigger} className="notification-trigger" aria-haspopup="dialog"
@@ -118,21 +126,17 @@ export default function NotificationBell({ role, accountId, listingsState, loadi
       </button>
       {open && (
         <div id={id} className="notification-panel" role="dialog" aria-label="Notifications">
-          {error && <p className="error notification-feedback" role="alert">{error}</p>}
-          {Object.entries(actionErrors).map(([key, message]) => message && (
-            <p className="error notification-feedback" key={key} role="alert">{message}</p>
+          <RequestError error={error} retry={retry} />
+          {Object.entries(actionErrors).map(([key, failure]) => failure && (
+            <RequestError key={key} error={failure.error} retry={() => actFromBell(key, failure.label)} />
           ))}
           {notice && <p className="notice notification-feedback" role="status">{notice}</p>}
+          {accountId && !listings && !error ? <FeedSkeleton title="Notifications" bell action={closeControl} /> :
           <LiveNotificationFeed items={items} readIds={readIds} onRead={markRead}
             onAction={actFromBell} dismissible={false} className="notification-panel-feed"
             height="min(420px, calc(70dvh - 70px))"
-            emptyMessage={!accountId ? 'Choose a demo account to see notifications.' :
-              !listings && !error ? 'Loading notifications…' : 'New notifications will appear here.'}
-            headerAction={
-              <button type="button" ref={closeButton} className="notification-close" aria-label="Close notifications" onClick={close}>
-                <X size={18} strokeWidth={1.5} aria-hidden="true" />
-              </button>
-            } />
+            emptyMessage={!accountId ? 'Choose a demo account to see notifications.' : 'New notifications will appear here.'}
+            headerAction={closeControl} />}
         </div>
       )}
     </div>

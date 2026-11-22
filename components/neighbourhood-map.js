@@ -5,6 +5,8 @@ import { divIcon } from 'leaflet';
 import { MapContainer, Marker, Polyline, Popup, TileLayer } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { readMapData } from '@/app/feed-data';
+import { networkError } from '@/lib/client-requests';
+import { RequestError } from './request-feedback';
 import { handlingGuidance, minutesUntil, safetyNotice, storageLabels } from '@/lib/listings';
 
 const legend = {
@@ -23,32 +25,35 @@ const position = ({ lat, lng }) => [lat, lng];
 
 export default function NeighbourhoodMap({ volunteerId }) {
   const [data, setData] = useState(null);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState(null);
+  const [attempt, setAttempt] = useState(0);
   const [routeId, setRouteId] = useState('');
 
   useEffect(() => {
     let active = true;
     let loading = false;
     async function refresh() {
-      if (loading) return;
+        if (loading || !navigator.onLine) return;
       loading = true;
       try {
         const result = await readMapData(volunteerId);
-        if (active && result) setData(result);
-        if (active) setError(!result);
+          if (active && !result.error) setData(result);
+          if (active) setError(result.error ?? null);
       } catch {
-        if (active) setError(true);
+          if (active && navigator.onLine) setError(networkError());
       } finally {
         loading = false;
       }
     }
     refresh();
     const timer = setInterval(refresh, 5000);
+    window.addEventListener('online', refresh);
     return () => {
       active = false;
       clearInterval(timer);
+      window.removeEventListener('online', refresh);
     };
-  }, [volunteerId]);
+  }, [volunteerId, attempt]);
 
   const route = data?.routes.find(({ id }) => String(id) === routeId) ?? data?.routes[0];
   const donor = data?.donors.find(({ id }) => id === route?.donor_id);
@@ -57,7 +62,7 @@ export default function NeighbourhoodMap({ volunteerId }) {
   return (
     <section className="panel map-panel" aria-labelledby="map-title">
       <h2 id="map-title">Neighbourhood map</h2>
-      {error && <p role="alert" className="error mb-2">Could not refresh the neighbourhood map.</p>}
+      <RequestError error={error} retry={() => setAttempt((value) => value + 1)} />
       {!data && !error && <p role="status" className="muted">Loading map…</p>}
       {data && (
         <>

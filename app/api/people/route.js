@@ -1,4 +1,5 @@
 import { database } from '../../../lib/db';
+import { errorResponse, serverFailure } from '@/lib/api-errors';
 
 export async function GET() {
   try {
@@ -16,7 +17,6 @@ export async function GET() {
       kgPerMeal: Number(settings.rows[0].value),
     });
   } catch (error) {
-    console.error('Could not load demo accounts:', error.message);
-    return Response.json({ error: 'Could not load demo accounts.' }, { status: 500 });
+    return errorResponse(503, serverFailure('Load demo accounts', error));
   }
 }

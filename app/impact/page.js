@@ -1,6 +1,6 @@
 import { Info } from 'lucide-react';
-import Link from 'next/link';
-import SiteHeader from '@/components/site-header';
+import { ImpactFrame } from '@/components/impact-settings-frames';
+import RouteFeedback from '@/components/route-feedback';
 import { readImpact } from '../feed-data';
 
 export const dynamic = 'force-dynamic';
@@ -60,15 +60,8 @@ function SavedChart({ days }) {
 export default async function ImpactPage() {
   const impact = await readImpact();
   return (
-    <>
-      <SiteHeader page="impact" />
-      <main className="container workspace">
-        <p className="eyebrow mb-3">All-time impact</p>
-        <div className="section-heading">
-          <h1>Food <em>rescued</em>.</h1>
-          <Link className="secondary" href="/settings">Edit assumptions</Link>
-        </div>
-        {impact ? (
+    <ImpactFrame>
+        {!impact.error ? (
           <>
             <div className="impact-metrics">
               <Metric id="meals-formula" label="Meals served" value={number.format(impact.meals)}
@@ -90,8 +83,7 @@ export default async function ImpactPage() {
             </div>
             <SavedChart days={impact.days} />
           </>
-        ) : <p role="status">Impact data is temporarily unavailable. Reload to try again.</p>}
-      </main>
-    </>
+        ) : <RouteFeedback error={impact.error} />}
+    </ImpactFrame>
   );
 }
