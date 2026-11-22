@@ -38,6 +38,7 @@ export default function LocationMap({ value, onChange }) {
   const [results, setResults] = useState(null);
   const [message, setMessage] = useState('');
   const [searching, setSearching] = useState(false);
+  const [locating, setLocating] = useState(false);
   const [target, setTarget] = useState(null);
   const busy = useRef(false);
 
@@ -73,22 +74,41 @@ export default function LocationMap({ value, onChange }) {
   }
 
   function locate() {
+    if (locating) return;
     if (!navigator.geolocation) {
-      setMessage('Your browser can’t share its location. Search or drag the pin instead.');
+      setMessage('Couldn’t find your location. Search or drag the pin instead.');
       return;
     }
-    setMessage('Finding your location…');
-    navigator.geolocation.getCurrentPosition(
-      ({ coords }) => {
-        setMessage('');
-        setResults(null);
-        choose({ lat: coords.latitude, lng: coords.longitude });
-      },
-      (failure) => setMessage(failure.code === 1
-        ? 'Location access is blocked. Allow it in your browser, or search for your area instead.'
-        : 'We couldn’t find your location. Search for your area or drag the pin instead.'),
-      { enableHighAccuracy: true, timeout: 10000 },
-    );
+    setLocating(true);
+    setMessage('');
+    let finished = false;
+    let watchdog;
+    // Always leave the "Finding your location…" state, whichever way this ends.
+    const finish = (text) => {
+      if (finished) return;
+      finished = true;
+      window.clearTimeout(watchdog);
+      setLocating(false);
+      setMessage(text);
+    };
+    // The browser's timeout only starts after permission is answered, so an ignored prompt needs its own limit.
+    watchdog = window.setTimeout(() => finish('Couldn’t find your location. Search or drag the pin instead.'), 15000);
+    try {
+      navigator.geolocation.getCurrentPosition(
+        ({ coords }) => {
+          if (finished) return;
+          setResults(null);
+          choose({ lat: coords.latitude, lng: coords.longitude });
+          finish('');
+        },
+        (failure) => finish(failure?.code === 1
+          ? 'Location is blocked. Allow it in your browser, or search instead.'
+          : 'Couldn’t find your location. Search or drag the pin instead.'),
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 },
+      );
+    } catch {
+      finish('Couldn’t find your location. Search or drag the pin instead.');
+    }
   }
 
   return (
@@ -106,8 +126,8 @@ export default function LocationMap({ value, onChange }) {
         <button type="button" className="secondary" onClick={search} disabled={searching}>
           {searching ? <Pending>Searching…</Pending> : <><Search size={16} strokeWidth={1.5} aria-hidden="true" />Search</>}
         </button>
-        <button type="button" className="secondary" onClick={locate}>
-          <LocateFixed size={16} strokeWidth={1.5} aria-hidden="true" />Use my current location
+        <button type="button" className="secondary" onClick={locate} disabled={locating}>
+          {locating ? <Pending>Finding your location…</Pending> : <><LocateFixed size={16} strokeWidth={1.5} aria-hidden="true" />Use my current location</>}
         </button>
       </div>
       {message && <p className="muted text-sm" role="status">{message}</p>}

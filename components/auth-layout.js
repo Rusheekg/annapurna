@@ -30,7 +30,7 @@ export function AuthLayout({ children }) {
         <Link href="/" aria-label="Annapurna home"><Image src="/brand/logo-mark.png" width={96} height={96} alt="" priority /></Link>
         <p className="auth-wordmark">Annapurna</p>
         <div className="auth-tagline"><span aria-hidden="true" /><p>Where surplus finds purpose.</p><span aria-hidden="true" /></div>
-        <p className="auth-script">Reduce Food Waste. Feed Communities.</p>
+        <p className="auth-script"><span>Reduce Food Waste.</span><span>Feed Communities.</span></p>
         <svg className="auth-swoosh" viewBox="0 0 320 20" aria-hidden="true" focusable="false" fill="none">
           <path d="M4 14C70 4 150 2 316 8" stroke="#C9973B" strokeWidth="2.5" strokeLinecap="round" />
         </svg>
