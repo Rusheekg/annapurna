@@ -2,14 +2,9 @@
 
 import { Bell, X } from 'lucide-react';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { validId } from '@/lib/listings';
 import { listingNotification, useAccountListings } from './account-listings';
-import { readJson } from '@/lib/client-requests';
 import { LiveNotificationFeed } from './ui/live-notification-feed';
 import { FeedSkeleton, RequestError } from './request-feedback';
-
-export const selectionKey = 'annapurna.selection';
-const roles = ['donor', 'receiver', 'volunteer'];
 
 function readStoredIds(key) {
   try {
@@ -23,7 +18,7 @@ function statusTime(listing) {
   return listing[`${listing.status}_at`] ?? listing.created_at;
 }
 
-export default function NotificationBell({ role, accountId, listingsState, loading }) {
+export default function NotificationBell({ role, accountId, listingsState }) {
   const storageKey = `annapurna.notifications.read.${role}.${accountId}`;
   const [readIds, setReadIds] = useState(() => readStoredIds(storageKey));
   const [open, setOpen] = useState(false);
@@ -118,7 +113,6 @@ export default function NotificationBell({ role, accountId, listingsState, loadi
   return (
     <div className="notification-bell" ref={root}>
       <button type="button" ref={trigger} className="notification-trigger" aria-haspopup="dialog"
-        disabled={loading}
         aria-expanded={open} aria-controls={id} aria-label={unread ? `Notifications, ${unread} unread` : 'Notifications'}
         onClick={() => open ? close() : setOpen(true)}>
         <Bell ref={icon} size={20} strokeWidth={1.5} aria-hidden="true" />
@@ -135,7 +129,7 @@ export default function NotificationBell({ role, accountId, listingsState, loadi
           <LiveNotificationFeed items={items} readIds={readIds} onRead={markRead}
             onAction={actFromBell} dismissible={false} className="notification-panel-feed"
             height="min(420px, calc(70dvh - 70px))"
-            emptyMessage={!accountId ? 'Choose a demo account to see notifications.' : 'New notifications will appear here.'}
+            emptyMessage="New notifications will appear here."
             headerAction={closeControl} />}
         </div>
       )}
@@ -143,34 +137,8 @@ export default function NotificationBell({ role, accountId, listingsState, loadi
   );
 }
 
-function AccountBell({ selection, loading }) {
+export function AccountBell({ selection }) {
   const { role, id } = selection;
   const listingsState = useAccountListings(role, id);
-  return <NotificationBell role={role} accountId={id} listingsState={listingsState} loading={loading} />;
-}
-
-export function SavedAccountBell() {
-  const [selection, setSelection] = useState({ role: 'donor', id: null });
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(selectionKey));
-      if (roles.includes(saved?.role) && validId(saved.id)) {
-        setSelection(saved);
-        setLoading(false);
-        return;
-      }
-    } catch {}
-
-    const controller = new AbortController();
-    readJson('/api/people', { signal: controller.signal }).then(({ donor }) => {
-      if (!controller.signal.aborted) setSelection({ role: 'donor', id: donor[0]?.id });
-    }).catch(() => {}).finally(() => {
-      if (!controller.signal.aborted) setLoading(false);
-    });
-    return () => controller.abort();
-  }, []);
-
-  return <AccountBell key={`${selection.role}:${selection.id}`} selection={selection} loading={loading} />;
+  return <NotificationBell role={role} accountId={id} listingsState={listingsState} />;
 }

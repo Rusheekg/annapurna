@@ -133,8 +133,8 @@ export function useAccountListings(role, accountId, revision = 0) {
       const version = writeVersion.current;
       try {
         const data = role === 'donor'
-          ? await readJson('/api/listings?donorId=' + accountId, { signal: controller.signal })
-          : await readWorkspaceListings(role, accountId);
+          ? await readJson('/api/listings', { signal: controller.signal })
+          : await readWorkspaceListings();
         if (controller.signal.aborted || version !== writeVersion.current) return;
         if (data?.error) throw data.error;
         if (!data) throw networkError();
@@ -178,7 +178,7 @@ export function useAccountListings(role, accountId, revision = 0) {
       const listing = await readJson('/api/listings/transition', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, listingId: Number(id), accountId, role }),
+        body: JSON.stringify({ action, listingId: Number(id) }),
       });
       setListings((previous) => previous.map((item) => item.id === listing.id ? { ...item, ...listing } : item));
       return true;

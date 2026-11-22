@@ -1,12 +1,12 @@
 'use server';
 
 import { database } from '../lib/db';
-import { validId } from '../lib/listings';
 import { distanceKm, volunteerPickupRadiusKm } from '../lib/matching';
 import { runEscalation } from '../lib/escalation';
 import { settingKeys, settingsFromRows } from '../lib/settings';
 import { serverFailure } from '@/lib/api-errors';
 import { missingAccount } from '@/lib/request-errors';
+import { workspaceIdentity } from '@/lib/auth';
 
 export async function readImpact() {
   try {
@@ -46,8 +46,11 @@ export async function readImpact() {
   }
 }
 
-export async function readWorkspaceListings(role, accountId) {
-  if (!validId(accountId)) return { error: missingAccount };
+export async function readWorkspaceListings() {
+  try {
+    const { profile, error } = await workspaceIdentity();
+    if (error) return { error };
+    const { role, id: accountId } = profile;
 
   const query = role === 'receiver' ? `
     SELECT l.*, d.name AS donor_name, n.match_reason
@@ -77,7 +80,6 @@ export async function readWorkspaceListings(role, accountId) {
   ` : null;
   if (!query) return { error: missingAccount };
 
-  try {
     await runEscalation();
     const accounts = role === 'receiver' ? 'receivers' : 'volunteers';
     if (!(await database().query(`SELECT 1 FROM public.${accounts} WHERE id = $1`, [accountId])).rows.length) {
@@ -90,10 +92,11 @@ export async function readWorkspaceListings(role, accountId) {
   }
 }
 
-export async function readMapData(volunteerId) {
-  if (volunteerId !== null && !validId(volunteerId)) return { error: missingAccount };
-
+export async function readMapData() {
   try {
+    const { profile, error } = await workspaceIdentity();
+    if (error) return { error };
+    const volunteerId = profile.role === 'volunteer' ? profile.id : null;
     const { rows: [data] } = await database().query(`
       SELECT
         ARRAY(SELECT json_build_object('id', id, 'name', name, 'lat', lat, 'lng', lng)

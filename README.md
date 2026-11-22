@@ -4,25 +4,29 @@ Annapurna connects surplus food from campus messes and canteens with nearby comm
 
 ## Run locally
 
-1. Install Node.js 20.9 or newer, then run `npm install`.
-2. Copy `.env.example` to `.env.local`. Set `DATABASE_URL` to the Supabase transaction pooler connection string (port 6543) for your demo database. URL-encode special characters in the password.
-3. For a fresh demo database, run `npm run db:setup` to preview the target host, then `npm run db:setup -- --force` to create and seed the app tables. The force command drops and replaces the six Annapurna tables. Skip setup when using an existing initialized database.
+1. Install Node.js 22 or newer, then run `npm install`.
+2. Copy `.env.example` to `.env.local`. Set `DATABASE_URL` to the Supabase transaction pooler URL (port 6543). Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` from the same Supabase project. URL-encode special characters in the database password.
+3. On an existing Milestone 4 database, apply [the accounts migration](db/migrations/004-accounts.sql) once. It preserves the existing organisations and listings. On a fresh disposable Supabase project, `npm run db:setup -- --force` creates and seeds the app tables. That command replaces the application tables, including profiles, and should only be used for intentional resets.
 4. Run `npm run dev` and open [localhost:3000](http://localhost:3000).
 
 In Windows PowerShell, use `npm.cmd` wherever a command above uses `npm` if execution policy blocks the npm PowerShell wrapper.
 
+## Email sign-in
+
+Enable the Email provider and sign-ups in Supabase Auth. Put `{{ .Token }}` in the confirmation and magic-link email templates so both new and returning users receive a six-digit code. Keep the resend interval at 60 seconds. Configure a custom SMTP sender for users outside the Supabase project team. The SSR proxy refreshes sessions, and refreshed browser cookies have a 30-day lifetime. Configure a 30-day session time box in Supabase if an absolute limit is required. [Supabase email OTP setup](https://supabase.com/docs/guides/auth/auth-email-passwordless)
+
+The home and impact pages are public. After a first sign-in, set up one donor, receiver, or volunteer profile. Only confirmed emails on the server's comma-separated `ADMIN_EMAILS` list can change the shared assumptions.
+
 ## Demo mode
 
-Use the role and account selectors to choose a synthetic donor, receiver, or volunteer without logging in. The selection is stored in the browser. As a donor, post surplus. As an offered receiver, claim it and choose how to collect it. If you request a volunteer, switch to a nearby volunteer account and accept, collect, and deliver the pickup. The setup seeds 14 days of listing history relative to the setup date.
-
-Anyone can open `/impact` and edit the shared demo assumptions at `/settings`. Changes are stored in the demo database and apply across browsers.
+Set `DEMO_MODE=true` to offer unlinked seeded organisations during onboarding. Each organisation can be linked to one sign-in. Judges need separate email addresses to try the donor, receiver, and volunteer roles. The setup seeds 14 days of listing history relative to the setup date.
 
 ## Architecture
 
-- Next.js App Router renders the landing page, role workspaces, impact dashboard, and settings. Route Handlers and Server Actions access PostgreSQL through the server-side `pg` pool.
-- Posting a listing and offering it to the top matching receivers happen in one database statement. Workspaces poll every five seconds. Polls also expire overdue pickups and offer unclaimed listings to the next group of eligible receivers.
-- Volunteers see open pickups within 5 km of their synthetic location, measured in a straight line to the donor. Assigned jobs stay available for tracking and handover. Leaflet displays the neighbourhood and pickup routes over OpenStreetMap tiles.
-- To deploy the demo, import the repository into Vercel and set `DATABASE_URL` to the Supabase transaction pooler URL.
+- Next.js App Router renders the public pages and authenticated workspaces. Route Handlers and Server Actions verify the Supabase user before looking up their profile and accessing PostgreSQL through the server-side `pg` pool.
+- Posting serializes checks per donor. Matching offers and the listing are inserted together. Donors can post 10 listings per hour, and each user can make 30 app write requests per minute. Workspaces poll every five seconds for updates.
+- Volunteers see open pickups within 5 km, measured in a straight line to the donor. Assigned jobs stay available for tracking and handover. Leaflet displays the neighbourhood and pickup routes over OpenStreetMap tiles.
+- In Vercel, set the variables from `.env.example` in the Preview environment for the auth branch and use Node.js 22 or later.
 
 ## Impact assumptions
 

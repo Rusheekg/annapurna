@@ -13,8 +13,8 @@ import { networkError, readJson } from '@/lib/client-requests';
 import { invalidField } from '@/lib/request-errors';
 import { FeedSkeleton, Pending, RequestError } from '@/components/request-feedback';
 import MissingPage from '@/components/missing-page';
-import NotificationBell, { selectionKey } from '@/components/notification-bell';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import NotificationBell from '@/components/notification-bell';
+import { useEffect, useRef, useState } from 'react';
 import { allergens, foods, maxPortions, safetyNotice, storageLabels } from '../lib/listings';
 
 const NeighbourhoodMap = dynamic(() => import('@/components/neighbourhood-map'), {
@@ -51,7 +51,7 @@ function WorkspaceFeed({ role, accountId, listingsState }) {
 function DonorListings({ donorId, kgPerMeal, listingsState, onPosted }) {
   return (
     <div className="workspace-grid">
-      <PostForm donorId={donorId} kgPerMeal={kgPerMeal} onPosted={onPosted} />
+      <PostForm kgPerMeal={kgPerMeal} onPosted={onPosted} />
       <WorkspaceFeed role="donor" accountId={donorId} listingsState={listingsState} />
     </div>
   );
@@ -106,7 +106,7 @@ function Chips({ label, options, selected, onChange }) {
   );
 }
 
-function PostForm({ donorId, kgPerMeal, onPosted }) {
+function PostForm({ kgPerMeal, onPosted }) {
   const [form, setForm] = useState(initialForm);
   const [posting, setPosting] = useState(false);
   const [repeating, setRepeating] = useState(false);
@@ -133,7 +133,7 @@ function PostForm({ donorId, kgPerMeal, onPosted }) {
     setNotice('');
     setRepeating(true);
     try {
-      const [listing] = await readJson('/api/listings?donorId=' + donorId);
+      const [listing] = await readJson('/api/listings');
       if (listing) setForm(repeatForm(listing));
       setNotice(listing ? 'Last post copied. Review the details and pickup times before posting.' : 'No previous post to repeat.');
     } catch (failure) {
@@ -166,7 +166,7 @@ function PostForm({ donorId, kgPerMeal, onPosted }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          donorId, foodItems, veg: form.veg, portions,
+          foodItems, veg: form.veg, portions,
           storage: form.storage, allergens: form.selectedAllergens,
           cookedAt: new Date(form.cookedAt).toJSON(),
           pickupBy: new Date(form.pickupBy).toJSON(),
@@ -224,7 +224,6 @@ function PostForm({ donorId, kgPerMeal, onPosted }) {
 const trustItems = [
   [Clock3, 'Time-limited pickups', 'Every listing has a pickup-by countdown'],
   [Tags, 'Allergen labels', 'Shown on every listing'],
-  [ShieldCheck, 'Synthetic data', 'No real addresses or people'],
 ];
 
 const howItWorks = [
@@ -233,7 +232,7 @@ const howItWorks = [
   ['Deliver', 'Volunteers collect the food and bring it to the receiving kitchen.'],
 ];
 
-function Landing({ onPost }) {
+export function Landing({ profile, demo }) {
   const [impact, setImpact] = useState(undefined);
   const [impactError, setImpactError] = useState(null);
   const [attempt, setAttempt] = useState(0);
@@ -260,7 +259,7 @@ function Landing({ onPost }) {
             <h1 id="hero-title">Where surplus<br className="desktop-break" />{' '}finds <em>purpose</em>.</h1>
             <p className="hero-description">Annapurna connects surplus food from hostel messes to nearby shelters and community kitchens before it spoils.</p>
             <div className="hero-actions">
-              <button className="primary" onClick={onPost}>Post surplus</button>
+              <Link className="primary" href="/workspace">{profile && profile.role !== 'donor' ? 'My workspace' : 'Post surplus'}</Link>
               <Link className="secondary" href="/impact">See impact</Link>
             </div>
             <dl id="impact" className="stats" aria-label="Annapurna impact" tabIndex={-1}>
@@ -281,7 +280,7 @@ function Landing({ onPost }) {
       </section>
       <section className="trust-strip" aria-label="Pickup information">
         <ul className="container trust-grid">
-          {trustItems.map(([Icon, title, description]) => (
+          {(demo ? [...trustItems, [ShieldCheck, 'Synthetic demo data', 'Seeded organisations are available during setup']] : trustItems).map(([Icon, title, description]) => (
             <li key={title}>
               <Icon size={18} strokeWidth={1.5} aria-hidden="true" />
               <div><strong>{title}</strong><p>{description}</p></div>
@@ -309,73 +308,10 @@ function Landing({ onPost }) {
   );
 }
 
-export default function Home({ initialRole = null, initialAccountId = null }) {
-  const [people, setPeople] = useState(null);
-  const [selection, setSelection] = useState({ role: initialRole ?? 'donor', id: null });
-  const [showWorkspace, setShowWorkspace] = useState(Boolean(initialRole));
-  const [error, setError] = useState('');
-  const [attempt, setAttempt] = useState(0);
-  const requestedRole = useRef(initialRole);
-  const focusControl = useRef(null);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    readJson('/api/people', { signal: controller.signal }).then((data) => {
-      if (controller.signal.aborted) return;
-      let saved;
-      try { saved = JSON.parse(localStorage.getItem(selectionKey)); } catch {}
-      setSelection((current) => {
-        if (current.id !== null) return current;
-        const savedRole = Object.hasOwn(roles, saved?.role) ? saved.role : current.role;
-        const role = requestedRole.current ?? savedRole;
-        const id = initialAccountId ?? data[role].find((person) => person.id === saved?.id)?.id ?? data[role][0]?.id;
-        return { role, id };
-      });
-      setPeople(data);
-      setError(null);
-    }).catch((failure) => {
-      if (!controller.signal.aborted) setError(failure.code ? failure : networkError());
-    });
-    return () => controller.abort();
-  }, [attempt, initialAccountId]);
-
-  useEffect(() => {
-    if (people) return;
-    const reconnect = () => setAttempt((value) => value + 1);
-    window.addEventListener('online', reconnect);
-    return () => window.removeEventListener('online', reconnect);
-  }, [people]);
-
-  function openWorkspace(role, id, control) {
-    requestedRole.current = role;
-    if (people) {
-      if (control && control === document.activeElement && (role !== selection.role || id !== selection.id)) {
-        focusControl.current = control.name;
-      }
-      const next = { role, id };
-      setSelection(next);
-      try { localStorage.setItem(selectionKey, JSON.stringify(next)); } catch {}
-    }
-    setShowWorkspace(true);
-    window.scrollTo(0, 0);
-  }
-
-  return <AccountView key={`${selection.role}:${selection.id}`} {...{
-    people, selection, showWorkspace, setShowWorkspace, error, openWorkspace, focusControl,
-    retryPeople: () => setAttempt((value) => value + 1),
-  }} />;
-}
-
-function AccountView({ people, selection, showWorkspace, setShowWorkspace, error, openWorkspace, focusControl, retryPeople }) {
+export default function HomeWorkspace({ profile, name, kgPerMeal, demo }) {
   const [revision, setRevision] = useState(0);
-  const listingsState = useAccountListings(selection.role, selection.id, revision);
-  const controls = useRef(null);
-
-  useLayoutEffect(() => {
-    if (!focusControl.current) return;
-    controls.current?.querySelector(`select[name="${focusControl.current}"]`)?.focus({ preventScroll: true });
-    focusControl.current = null;
-  }, [focusControl]);
+  const { role, id } = profile;
+  const listingsState = useAccountListings(role, id, revision);
 
   if (listingsState.error?.code === 'NOT_FOUND' ||
       Object.values(listingsState.actionErrors).some((failure) => failure?.error?.code === 'NOT_FOUND')) {
@@ -384,52 +320,17 @@ function AccountView({ people, selection, showWorkspace, setShowWorkspace, error
 
   return (
     <>
-      <SiteHeader tagline={!showWorkspace} notificationBell={
-        <NotificationBell role={selection.role} accountId={selection.id} listingsState={listingsState} loading={!people && !error} />
-      } onBrandClick={(event) => {
-        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-        event.preventDefault();
-        setShowWorkspace(false);
-        window.scrollTo(0, 0);
-      }}>
-        <div className="role-switcher" ref={controls}>
-          <label>View as<select name="role" value={showWorkspace ? selection.role : ''} onChange={(event) => {
-            const role = event.target.value;
-            openWorkspace(role, role === selection.role ? selection.id : people[role][0]?.id, event.currentTarget);
-          }} disabled={!people}>
-            <option value="" disabled>Choose a role</option>
-            {Object.entries(roles).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-          </select></label>
-          {people && (
-            <label>{showWorkspace ? roles[selection.role] : 'Demo'} account
-              <select name="account" value={selection.id ?? ''} onChange={(event) => openWorkspace(selection.role, Number(event.target.value), event.currentTarget)}>
-                {people[selection.role].map(({ id, name }) => <option key={id} value={id}>{name}</option>)}
-              </select>
-            </label>
-          )}
-        </div>
-      </SiteHeader>
-      {showWorkspace ? (
-        <main className="container workspace">
-          <h1>{roles[selection.role]} <em>workspace</em></h1>
-          <RequestError error={error} retry={retryPeople} />
-          {!people && !error && <FeedSkeleton title={workspaceFeeds[selection.role][0]} />}
-          {people && !selection.id && <p>No demo accounts are available for this role.</p>}
-          {people && selection.id && (selection.role === 'donor' ? (
-            <DonorListings donorId={selection.id} kgPerMeal={people.kgPerMeal} listingsState={listingsState}
+      <SiteHeader page="workspace" signedIn profile={profile} demo={demo}
+        notificationBell={<NotificationBell role={role} accountId={id} listingsState={listingsState} />} />
+      <main className="container workspace">
+        <h1>{roles[role]} <em>workspace</em></h1>
+        <p className="eyebrow workspace-account">{name}</p>
+        {role === 'donor'
+          ? <DonorListings donorId={id} kgPerMeal={kgPerMeal} listingsState={listingsState}
               onPosted={() => setRevision((value) => value + 1)} />
-          ) : (
-            <>
-              <p className="eyebrow workspace-account">{people[selection.role].find((person) => person.id === selection.id)?.name}</p>
-              <WorkspaceFeed role={selection.role} accountId={selection.id} listingsState={listingsState} />
-            </>
-          ))}
-          {people && selection.id && <NeighbourhoodMap key={selection.role === 'volunteer' ? selection.id : 'all'}
-            volunteerId={selection.role === 'volunteer' ? selection.id : null} />}
-        </main>
-      ) : (
-        <Landing onPost={() => openWorkspace('donor', selection.role === 'donor' ? selection.id : people?.donor[0]?.id)} />
-      )}
+          : <WorkspaceFeed role={role} accountId={id} listingsState={listingsState} />}
+        <NeighbourhoodMap />
+      </main>
     </>
   );
 }

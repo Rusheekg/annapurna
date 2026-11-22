@@ -1,8 +1,11 @@
 import { ImpactFrame } from '@/components/impact-settings-frames';
+import { getIdentity, isAdmin } from '@/lib/auth';
+import { demoEnabled } from '@/lib/onboarding';
 
-export default function Loading() {
+export default async function Loading() {
+  const { user, profile } = await getIdentity();
   return (
-    <ImpactFrame>
+    <ImpactFrame session={{ signedIn: Boolean(user), profile, demo: demoEnabled() }} editable={isAdmin(user)}>
       <div aria-busy="true">
         <span className="sr-only" role="status">Loading impact…</span>
         <div className="impact-metrics" aria-hidden="true">

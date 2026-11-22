@@ -9,7 +9,7 @@ export default function MissingPage() {
       <p className="muted">We couldn't find the page, listing, or account you were looking for.</p>
       <div className="fallback-actions">
         <Link href="/" className="secondary">Back to home</Link>
-        <Link href="/?view=donor" className="primary">Post surplus</Link>
+        <Link href="/workspace" className="primary">Post surplus</Link>
       </div>
     </main>
   );

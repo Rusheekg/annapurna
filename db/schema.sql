@@ -1,4 +1,4 @@
-DROP TABLE IF EXISTS public.notifications, public.listings, public.settings,
+DROP TABLE IF EXISTS public.auth_write_limits, public.profiles, public.notifications, public.listings, public.settings,
   public.volunteers, public.receivers, public.donors;
 
 CREATE TABLE public.donors (
@@ -74,3 +74,26 @@ ALTER TABLE public.volunteers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.listings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE public.donors ADD COLUMN is_demo boolean NOT NULL DEFAULT false;
+ALTER TABLE public.receivers ADD COLUMN is_demo boolean NOT NULL DEFAULT false;
+ALTER TABLE public.volunteers ADD COLUMN is_demo boolean NOT NULL DEFAULT false;
+
+CREATE TABLE public.profiles (
+  user_id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  role text NOT NULL CHECK (role IN ('donor', 'receiver', 'volunteer')),
+  account_id integer NOT NULL CHECK (account_id > 0),
+  UNIQUE (role, account_id)
+);
+
+CREATE TABLE public.auth_write_limits (
+  user_id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  attempts timestamptz[] NOT NULL CHECK (cardinality(attempts) <= 30)
+);
+
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.auth_write_limits ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.profiles, public.auth_write_limits FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.profiles TO authenticated;
+CREATE POLICY read_own_profile ON public.profiles
+  FOR SELECT TO authenticated USING ((SELECT auth.uid()) = user_id);

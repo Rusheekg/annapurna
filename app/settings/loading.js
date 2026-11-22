@@ -1,9 +1,12 @@
 import { SettingsFrame } from '@/components/impact-settings-frames';
 import { assumptionFields, demoAssumptionNote } from '@/lib/impact-assumptions';
+import { getIdentity, isAdmin } from '@/lib/auth';
+import { demoEnabled } from '@/lib/onboarding';
 
-export default function Loading() {
+export default async function Loading() {
+  const { user, profile } = await getIdentity();
   return (
-    <SettingsFrame>
+    <SettingsFrame session={{ signedIn: Boolean(user), profile, demo: demoEnabled() }}>
       <div className="panel settings-panel" aria-busy="true">
         <span className="sr-only" role="status">Loading assumptions…</span>
         <div className="grid gap-5" aria-hidden="true">
@@ -14,10 +17,10 @@ export default function Loading() {
               <p className="muted mt-1 text-sm">{description}</p>
             </div>
           ))}
-          <div className="flex flex-wrap gap-3">
+          {isAdmin(user) && <div className="flex flex-wrap gap-3">
             <span className="primary settings-save skeleton skeleton-button">Save assumptions</span>
             <span className="secondary settings-save skeleton skeleton-button">Reset to defaults</span>
-          </div>
+          </div>}
         </div>
         <p className="muted mt-4 text-sm">{demoAssumptionNote}</p>
       </div>

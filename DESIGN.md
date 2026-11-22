@@ -29,7 +29,7 @@ No gradients, no drop shadows heavier than `0 1px 2px rgba(0,0,0,0.04)`.
 - Max content width 1100px, centred, side padding 24px (16px on mobile).
 - Section spacing 64–96px desktop, 40px mobile.
 - **Announcement bar** at the very top: forest background, cream text, 12px uppercase, letter-spaced. Text: "SYNTHETIC DEMO DATA · ANNAPURNA DOES NOT CERTIFY FOOD SAFETY".
-- **Header:** paper background. Left: the logo mark `/brand/logo-mark.png` (circular, 40px, use `next/image`) followed by the wordmark "Annapurna" in Playfair Display 22px forest. Role switcher dropdowns on the right styled as minimal underlined selects.
+- The **header** uses paper behind the 40px logo mark and the 22px Playfair Display wordmark. The session control shows Sign in or Sign out. Linked accounts also see Workspace and the notification bell.
 - **Logo files:** `public/brand/logo-mark.png` (circular emblem, transparent corners), `public/brand/logo-full.jpg` (full brand artwork, use only on the About/pitch section, never in the header). Favicon and app icons live in `app/favicon.ico`, `app/icon.png`, `app/apple-icon.png`.
 - **Tagline:** "Where surplus finds purpose." Use it under the wordmark on the home page and in the page `<title>` ("Annapurna · Where surplus finds purpose").
 
@@ -76,7 +76,7 @@ A ready-made animated feed component (TypeScript, Tailwind, shadcn-style colour 
 
 **Where to use it:**
 - **How it works** shows the autoplaying synthetic demo from `components/home-live-feed.tsx`.
-- The **site header** places a lucide Bell to the left of the role switcher. It uses a 44px target and shows the account's unread count when it is above zero. Newly arrived items trigger one wiggle unless reduced motion is enabled.
+- The **site header** places a lucide Bell beside Sign out for signed-in accounts with a profile. It uses a 44px target and shows the account's unread count when it is above zero. Newly arrived items trigger one wiggle unless reduced motion is enabled.
 - The **bell panel** is about 400px wide and capped at 70vh, with a full-width sheet below 640px. Show offers and Claim for receivers, listing status updates for donors, and pickup jobs with Accept, Mark collected, and Mark delivered for volunteers. Use the existing five-second polling and listing actions. Escape, outside click, and the close button dismiss the panel and restore focus to the bell.
 - Opening a notification or using its action marks it read. **Read all** marks the active account's current notifications read. Store read IDs in localStorage per role and account so they survive polling and refreshes.
 - Set the **feed title** in DM Sans at 14px and weight 600, scoped to the feed. Keep Read all and Clear on single lines wherever those controls are shown.

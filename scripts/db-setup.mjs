@@ -26,7 +26,7 @@ if (!process.argv.slice(2).includes('--force')) {
   console.error(`Refusing to replace the Annapurna tables on database host ${target}. Run npm run db:setup -- --force to proceed.`);
   process.exit(1);
 }
-console.log(`Replacing the six Annapurna tables and their data on database host ${target}.`);
+console.log(`Replacing the Annapurna application tables, including profiles, on database host ${target}.`);
 
 try {
   const [schema, seed] = await Promise.all([
@@ -43,7 +43,7 @@ try {
     await client.query('ROLLBACK');
     throw error;
   }
-  console.log('Created and seeded the six Annapurna tables.');
+  console.log('Created and seeded the Annapurna application tables.');
 } catch (error) {
   console.error('Database setup failed:', error.message);
   process.exitCode = 1;

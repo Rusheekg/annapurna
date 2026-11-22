@@ -8,7 +8,7 @@ import { assumptionFields, demoAssumptionNote } from '@/lib/impact-assumptions';
 
 const defaults = { kg_per_meal: 0.4, co2e_per_kg: 2.5, avg_speed_kmph: 15 };
 
-export default function SettingsForm({ initialValues }) {
+export default function SettingsForm({ initialValues, editable }) {
   const router = useRouter();
   const [values, setValues] = useState(initialValues);
   const [pending, setPending] = useState(null);
@@ -48,6 +48,7 @@ export default function SettingsForm({ initialValues }) {
   return (
     <form className="panel settings-panel" noValidate onSubmit={(event) => {
       event.preventDefault();
+      if (!editable) return;
       save(Object.fromEntries(assumptionFields.map(([key]) => [key, Number(values[key])])));
     }}>
       <fieldset disabled={Boolean(pending)} className="grid gap-5">
@@ -55,6 +56,7 @@ export default function SettingsForm({ initialValues }) {
           <div key={key}>
             <label htmlFor={key}>{label}</label>
             <input id={key} type="number" min="0" step="any" required inputMode="decimal"
+              readOnly={!editable}
               aria-invalid={error?.field === key || undefined}
               aria-describedby={error?.field === key ? `${key}-hint ${key}-error` : `${key}-hint`} value={values[key]}
               onChange={(event) => {
@@ -66,12 +68,12 @@ export default function SettingsForm({ initialValues }) {
             {error?.field === key && <RequestError id={`${key}-error`} error={error} />}
           </div>
         ))}
-        <div className="flex flex-wrap gap-3">
+        {editable && <div className="flex flex-wrap gap-3">
           <button className="primary settings-save" type="submit">{pending === 'save' ? <Pending>Saving…</Pending> : 'Save assumptions'}</button>
           <button className="secondary settings-save" type="button" onClick={reset}>
             {pending === 'reset' ? <Pending>Resetting…</Pending> : 'Reset to defaults'}
           </button>
-        </div>
+        </div>}
       </fieldset>
       <p className="muted mt-4 text-sm">{demoAssumptionNote}</p>
       {error && !error.field && <RequestError error={error} retry={error.retry} />}

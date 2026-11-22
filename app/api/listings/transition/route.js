@@ -3,6 +3,7 @@ import { validId } from '@/lib/listings';
 import { distanceKm, volunteerPickupRadiusKm } from '@/lib/matching';
 import { errorResponse, serverFailure } from '@/lib/api-errors';
 import { expiredMessage, invalidField, missingAccount, missingListing } from '@/lib/request-errors';
+import { roleForbidden, writeIdentity } from '@/lib/auth';
 
 const transitions = {
   claim: {
@@ -51,16 +52,18 @@ const handoverOwner = {
 };
 
 export async function PATCH(request) {
-  const { listingId, accountId, action, role } = (await request.json().catch(() => null)) ?? {};
-  const transition = typeof action === 'string' && Object.hasOwn(transitions, action) ? transitions[action] : null;
-  const allowed = transition?.handover
-    ? typeof role === 'string' && Object.hasOwn(handoverOwner, role)
-    : role === (action === 'accept' ? 'volunteer' : 'receiver');
-  if (!transition || !allowed || !validId(listingId) || !validId(accountId)) {
-    return errorResponse(400, invalidField(null, 'Choose a valid listing, account and action.'));
-  }
-
   try {
+    const { profile, response } = await writeIdentity();
+    if (response) return response;
+    const { role, id: accountId } = profile;
+    const { listingId, action } = (await request.json().catch(() => null)) ?? {};
+    const transition = typeof action === 'string' && Object.hasOwn(transitions, action) ? transitions[action] : null;
+    if (!transition || !validId(listingId)) {
+      return errorResponse(400, invalidField(null, 'Choose a valid listing and action.'));
+    }
+    const allowed = transition.handover ? Object.hasOwn(handoverOwner, role)
+      : role === (action === 'accept' ? 'volunteer' : 'receiver');
+    if (!allowed) return errorResponse(403, roleForbidden);
     const owner = transition.handover ? ' AND ' + handoverOwner[role] : '';
     const { rows } = await database().query(
       `UPDATE public.listings AS l SET ${transition.set}
@@ -71,11 +74,13 @@ export async function PATCH(request) {
       const accounts = role === 'receiver' ? 'receivers' : 'volunteers';
       const { rows: [listing] } = await database().query(
         `SELECT status, receiver_id, pickup_by <= now() AS deadline_passed,
+           EXISTS (SELECT 1 FROM public.notifications WHERE listing_id = $1 AND receiver_id = $2) AS offered,
            EXISTS (SELECT 1 FROM public.${accounts} WHERE id = $2) AS account_exists
          FROM public.listings WHERE id = $1`, [listingId, accountId],
       );
       if (!listing) return errorResponse(404, missingListing);
       if (!listing.account_exists) return errorResponse(404, missingAccount);
+      if (action === 'claim' && !listing.offered) return errorResponse(403, roleForbidden);
       if (listing.status === 'expired' || (listing.deadline_passed && ['posted', 'claimed'].includes(listing.status))) {
         return errorResponse(409, { code: 'EXPIRED', message: expiredMessage });
       }

@@ -2,6 +2,8 @@ import { Info } from 'lucide-react';
 import { ImpactFrame } from '@/components/impact-settings-frames';
 import RouteFeedback from '@/components/route-feedback';
 import { readImpact } from '../feed-data';
+import { getIdentity, isAdmin } from '@/lib/auth';
+import { demoEnabled } from '@/lib/onboarding';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Impact · Annapurna' };
@@ -58,9 +60,9 @@ function SavedChart({ days }) {
 }
 
 export default async function ImpactPage() {
-  const impact = await readImpact();
+  const [impact, { user, profile }] = await Promise.all([readImpact(), getIdentity()]);
   return (
-    <ImpactFrame>
+    <ImpactFrame session={{ signedIn: Boolean(user), profile, demo: demoEnabled() }} editable={isAdmin(user)}>
         {!impact.error ? (
           <>
             <div className="impact-metrics">

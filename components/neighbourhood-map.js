@@ -23,7 +23,7 @@ const icons = Object.fromEntries(Object.keys(legend).map((kind) => [kind, divIco
 })]));
 const position = ({ lat, lng }) => [lat, lng];
 
-export default function NeighbourhoodMap({ volunteerId }) {
+export default function NeighbourhoodMap() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [attempt, setAttempt] = useState(0);
@@ -36,7 +36,7 @@ export default function NeighbourhoodMap({ volunteerId }) {
         if (loading || !navigator.onLine) return;
       loading = true;
       try {
-        const result = await readMapData(volunteerId);
+          const result = await readMapData();
           if (active && !result.error) setData(result);
           if (active) setError(result.error ?? null);
       } catch {
@@ -53,7 +53,7 @@ export default function NeighbourhoodMap({ volunteerId }) {
       clearInterval(timer);
       window.removeEventListener('online', refresh);
     };
-  }, [volunteerId, attempt]);
+  }, [attempt]);
 
   const route = data?.routes.find(({ id }) => String(id) === routeId) ?? data?.routes[0];
   const donor = data?.donors.find(({ id }) => id === route?.donor_id);

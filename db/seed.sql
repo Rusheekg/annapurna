@@ -1,9 +1,9 @@
 INSERT INTO public.settings (key, value) VALUES
   ('kg_per_meal', 0.4), ('co2e_per_kg', 2.5), ('avg_speed_kmph', 15);
 
-INSERT INTO public.donors (name, type, lat, lng)
+INSERT INTO public.donors (name, type, lat, lng, is_demo)
 SELECT name, CASE WHEN n <= 10 THEN 'hostel_mess' ELSE 'canteen' END,
-  12.935 + 0.018 * sin(n), 77.615 + 0.018 * cos(n)
+  12.935 + 0.018 * sin(n), 77.615 + 0.018 * cos(n), true
 FROM unnest(ARRAY[
   'Hostel Block A Mess', 'Hostel Block B Mess', 'Hostel Block C Mess',
   'Hostel Block D Mess', 'Hostel Block E Mess', 'Hostel Block F Mess',
@@ -13,9 +13,9 @@ FROM unnest(ARRAY[
 ]) WITH ORDINALITY AS names(name, n)
 ORDER BY n;
 
-INSERT INTO public.receivers (name, type, lat, lng, daily_need_meals, can_store_chilled)
+INSERT INTO public.receivers (name, type, lat, lng, daily_need_meals, can_store_chilled, is_demo)
 SELECT name, type, 12.935 + 0.021 * sin(n + 0.5), 77.615 + 0.021 * cos(n + 0.5),
-  20 + (n - 1) * 14, n % 2 = 0
+  20 + (n - 1) * 14, n % 2 = 0, true
 FROM (VALUES
   (1, 'Open Hearth Kitchen', 'community_kitchen'),
   (2, 'Blue Banyan Collective', 'ngo'),
@@ -30,9 +30,9 @@ FROM (VALUES
 ) AS names(n, name, type)
 ORDER BY n;
 
-INSERT INTO public.volunteers (name, lat, lng, available)
+INSERT INTO public.volunteers (name, lat, lng, available, is_demo)
 SELECT 'Demo Volunteer ' || lpad(n::text, 2, '0'),
-  12.935 + 0.016 * sin(n + 1.1), 77.615 + 0.016 * cos(n + 1.1), n % 5 <> 0
+  12.935 + 0.016 * sin(n + 1.1), 77.615 + 0.016 * cos(n + 1.1), n % 5 <> 0, true
 FROM generate_series(1, 20) AS series(n)
 ORDER BY n;
 
