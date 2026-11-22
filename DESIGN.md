@@ -34,7 +34,8 @@ No gradients, no drop shadows heavier than `0 1px 2px rgba(0,0,0,0.04)`.
 - **Tagline:** "Where surplus finds purpose." Use it under the wordmark on the home page and in the page `<title>` ("Annapurna · Where surplus finds purpose").
 
 ## 4. Components
-- **Primary button:** forest background, white DM Sans 14px/500, square corners (radius 2px), padding 14px 22px, trailing "→" arrow. Hover: slightly lighter forest.
+- **Button corners:** every button (primary, secondary/outline, icon buttons, feed actions such as Claim/Skip/Read all) uses the shared `--radius-control` token (10px, the auth Login button's radius) defined once in `globals.css`. Use `var(--radius-control)` in CSS or `rounded-[var(--radius-control)]` in Tailwind; never hard-code the value.
+- **Primary button:** forest background, white DM Sans 14px/500, rounded corners (`--radius-control`), padding 14px 22px, trailing "→" arrow. Hover: slightly lighter forest.
 - **Secondary button:** transparent, 1px forest border, same shape.
 - **Chips (food items, allergens, filters):** pill shape (radius 999px), 1px `--line` border, 13px text; selected = forest fill, white text.
 - **Cards:** white, 1px `--line` border, radius 4px, padding 24px. No heavy shadows.
@@ -45,7 +46,7 @@ No gradients, no drop shadows heavier than `0 1px 2px rgba(0,0,0,0.04)`.
   - "Time-limited pickups" / "Every listing has a pickup-by countdown"
   - "Allergen labels" / "Shown on every listing"
   - "Synthetic data" / "No real addresses or people"
-- **Inputs:** no boxes; bottom border only (1px `--line`), forest on focus. Labels as eyebrow style above.
+- **Inputs and dropdowns:** 1px `--line` border with `--radius-control` corners (matching the auth inputs), forest on focus. Labels as eyebrow style above.
 - **Match reason text:** muted DM Sans 13px with "·" separators, e.g. "2.1 km · fits your need of 60 · arrives 70 min early".
 - Icons: `lucide-react`, stroke width 1.5, 18px.
 
@@ -84,4 +85,4 @@ A ready-made animated feed component (TypeScript, Tailwind, shadcn-style colour 
 - **Donor workspace:** "My listings" as the same delivery feed (no actions), so donors watch status move.
 - **Volunteer workspace:** pickup jobs as delivery items with `actions: [{label:"Accept", done:"Accepted"}]`, then "Mark collected" / "Mark delivered".
 - Use only palette colours for `accent` (forest, sage, gold, amber). No bright blues, pinks or purples, and no blurred colour glows behind it.
-- The feed's rounded corners are allowed as the one exception to the square-corner rule.
+- The feed card's rounded corners are allowed as an exception to the card radius; its buttons use `--radius-control` like every other button.

@@ -686,7 +686,7 @@ function CodeDetail({ item, play, delay, reduced }: StoryProps & { item: CodeNot
           type="button"
           data-copy={copy}
           onClick={copyCode}
-          className="relative z-[1] ml-auto h-7 shrink-0 rounded-full border border-border bg-background px-2.5 text-xs font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="relative z-[1] ml-auto h-7 shrink-0 rounded-[var(--radius-control)] border border-border bg-background px-2.5 text-xs font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           {copy === "done" ? "Copied" : copy === "blocked" ? "Copy blocked" : "Copy"}
         </button>
@@ -994,7 +994,7 @@ function NotificationCard({
                   {item.actions && item.actions.length > 0 && (
                     <div className="relative z-[1] mt-2.5 flex flex-wrap items-center gap-2">
                       {done ? (
-                        <span data-done className="inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium" style={{ background: TINT }}>
+                        <span data-done className="inline-flex h-7 items-center gap-1.5 rounded-[var(--radius-control)] px-2.5 text-xs font-medium" style={{ background: TINT }}>
                           <Icon d={CHECK} className="size-3.5" />
                           <span className="text-foreground">{done}</span>
                         </span>
@@ -1010,7 +1010,7 @@ function NotificationCard({
                               onAction(action);
                             }}
                             className={cx(
-                              "inline-flex h-7 items-center gap-2 rounded-full px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-70",
+                              "inline-flex h-7 items-center gap-2 rounded-[var(--radius-control)] px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-70",
                               i === 0 ? "bg-foreground text-background hover:bg-foreground/85" : "border border-border bg-background text-foreground hover:bg-muted",
                             )}
                           >
@@ -1039,7 +1039,7 @@ function NotificationCard({
                 event.stopPropagation();
                 onDismiss();
               }}
-              className="absolute right-2 top-2 z-[2] grid size-6 place-items-center rounded-full text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-hover:opacity-100"
+              className="absolute right-2 top-2 z-[2] grid size-6 place-items-center rounded-[var(--radius-control)] text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-hover:opacity-100"
             >
               <Icon d={CLOSE} className="size-3.5" />
             </button>}
@@ -1304,7 +1304,7 @@ export function LiveNotificationFeed({
             data-read-all
             disabled={unread === 0}
             onClick={() => markRead(live.map((e) => e.id))}
-            className="whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
+            className="whitespace-nowrap rounded-[var(--radius-control)] px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
           >
             Read all
           </button>
@@ -1313,7 +1313,7 @@ export function LiveNotificationFeed({
             data-clear
             disabled={live.length === 0}
             onClick={clearAll}
-            className="whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
+            className="whitespace-nowrap rounded-[var(--radius-control)] px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
           >
             Clear
           </button>}
