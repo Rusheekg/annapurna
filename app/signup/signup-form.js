@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRef, useState } from 'react';
 import { AuthCard } from '@/components/auth-layout';
-import { GoogleButton, IconInput, NameIcon, OrDivider } from '@/components/auth-parts';
+import { GoogleSection, IconInput, NameIcon } from '@/components/auth-parts';
 import CodeEntry from '@/components/code-entry';
 import PasswordField from '@/components/password-field';
 import { Pending, RequestError } from '@/components/request-feedback';
@@ -81,8 +81,7 @@ export default function SignupForm({ next }) {
             {pending ? <Pending>Creating account…</Pending> : 'Sign Up'}
           </button>
         </fieldset>
-        <OrDivider />
-        <GoogleButton next={next} disabled={pending} onError={setError} />
+        <GoogleSection next={next} disabled={pending} onError={setError} />
         <p className="auth-switch">Already have an account? <Link className="auth-link" href={next ? `/login?next=${encodeURIComponent(next)}` : '/login'}>Login</Link></p>
       </form>
     </AuthCard>

@@ -60,3 +60,16 @@ export function GoogleButton({ next, onError, disabled }) {
     </button>
   );
 }
+
+// Google sign-in stays built but hidden: set NEXT_PUBLIC_GOOGLE_AUTH=true (and enable the provider in Supabase) to show it.
+export const googleAuthEnabled = process.env.NEXT_PUBLIC_GOOGLE_AUTH === 'true';
+
+export function GoogleSection({ next, onError, disabled }) {
+  if (!googleAuthEnabled) return null;
+  return (
+    <>
+      <OrDivider />
+      <GoogleButton next={next} onError={onError} disabled={disabled} />
+    </>
+  );
+}

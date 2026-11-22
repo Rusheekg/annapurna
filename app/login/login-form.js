@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRef, useState } from 'react';
 import { AuthCard } from '@/components/auth-layout';
-import { GoogleButton, IconInput, OrDivider } from '@/components/auth-parts';
+import { GoogleSection, IconInput } from '@/components/auth-parts';
 import CodeEntry from '@/components/code-entry';
 import PasswordField from '@/components/password-field';
 import { Pending, RequestError } from '@/components/request-feedback';
@@ -73,8 +73,7 @@ export default function LoginForm({ next, initialError }) {
           </button>
         </fieldset>
         <p className="muted text-sm">Signed up with a code before? Use Forgot password to set a password.</p>
-        <OrDivider />
-        <GoogleButton next={next} disabled={Boolean(pending)} onError={setError} />
+        <GoogleSection next={next} disabled={Boolean(pending)} onError={setError} />
         <p className="auth-switch">New here? <Link className="auth-link" href={next ? `/signup?next=${encodeURIComponent(next)}` : '/signup'}>Create account</Link></p>
       </form>
     </AuthCard>
