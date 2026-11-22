@@ -3,8 +3,8 @@ import Link from 'next/link';
 
 const leaf = 'M0 24C0 8 10 0 24 0c0 16-8 26-24 24Z';
 
-// Two-column sign-in layout: brand on the left, the form card on the right. Decoration is aria-hidden.
-export default function AuthShell({ children }) {
+// Two-column sign-in layout: brand on the left (stacked on mobile), the page content on the right. Decoration is aria-hidden.
+export function AuthLayout({ children }) {
   return (
     <main className="auth-page">
       <svg className="auth-wave" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true" focusable="false">
@@ -35,7 +35,17 @@ export default function AuthShell({ children }) {
           <path d="M4 14C70 4 150 2 316 8" stroke="#C9973B" strokeWidth="2.5" strokeLinecap="round" />
         </svg>
       </div>
-      <div className="auth-card">{children}</div>
+      {children}
     </main>
+  );
+}
+
+// The white rounded card every auth screen uses, with its heading.
+export function AuthCard({ title, children }) {
+  return (
+    <div className="auth-card auth-form">
+      <h1 className="auth-heading">{title}</h1>
+      {children}
+    </div>
   );
 }

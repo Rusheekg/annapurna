@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import AuthShell from '@/components/auth-shell';
+import { AuthLayout } from '@/components/auth-layout';
 import { getIdentity } from '@/lib/auth';
 import ForgotForm from './forgot-form';
 
@@ -9,8 +9,8 @@ export default async function ForgotPage() {
   const { user, ready } = await getIdentity();
   if (user) redirect(ready ? '/post' : '/welcome');
   return (
-    <AuthShell>
+    <AuthLayout>
       <ForgotForm />
-    </AuthShell>
+    </AuthLayout>
   );
 }

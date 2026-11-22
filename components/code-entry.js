@@ -1,10 +1,14 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
+import { ShieldCheck } from 'lucide-react';
 import { Pending, RequestError } from '@/components/request-feedback';
 
-// Six-digit code step. `verify(code)` and `resend()` throw request errors; "Resend code" unlocks after 60 seconds.
-export default function CodeEntry({ email, verify, resend, onBack, initialCooldown = true, id = 'code' }) {
+// Six-digit code step: ONE input so pasting works. `verify(code)` and `resend()` throw request errors.
+// "Resend code" unlocks after 60 seconds. `children` is a small helper line shown under the links.
+export default function CodeEntry({ email, verify, resend, onBack, initialCooldown = true, id: idProp, children }) {
+  const generated = useId();
+  const id = idProp ?? generated;
   const [code, setCode] = useState('');
   const [pending, setPending] = useState(null);
   const [error, setError] = useState(null);
@@ -46,28 +50,35 @@ export default function CodeEntry({ email, verify, resend, onBack, initialCooldo
   }
 
   return (
-    <form className="grid gap-4" noValidate onSubmit={(event) => { event.preventDefault(); run('verify'); }}>
+    <form className="auth-form" noValidate onSubmit={(event) => { event.preventDefault(); run('verify'); }}>
+      <p>Enter the six-digit code sent to <strong>{email}</strong>.</p>
       <fieldset className="grid gap-4" disabled={Boolean(pending)}>
-        <p>Enter the six-digit code sent to <strong>{email}</strong>.</p>
-        <div>
-          <label htmlFor={id}>Verification code</label>
-          <input id={id} value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, ''))}
+        <div className="auth-field">
+          <label htmlFor={id} className="sr-only">Verification code</label>
+          <ShieldCheck className="auth-field-icon" size={18} strokeWidth={1.5} aria-hidden="true" />
+          <input id={id} className="auth-code" value={code} placeholder="------"
+            onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+            onPaste={(event) => {
+              // maxLength would cut "123 456" at 6 characters before the space is removed, so clean pasted text first.
+              event.preventDefault();
+              setCode(event.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6));
+            }}
             inputMode="numeric" autoComplete="one-time-code" maxLength={6}
             aria-invalid={Boolean(error) || undefined} aria-describedby={error ? `${id}-error` : undefined} />
         </div>
         <RequestError id={`${id}-error`} error={error} retry={() => run('verify')} />
-        <button className="primary settings-save" type="submit">
+        <button className="primary auth-submit" type="submit">
           {pending === 'verify' ? <Pending>Checking…</Pending> : 'Verify code'}
         </button>
-        <div className="flex flex-wrap gap-2">
-          <button className="secondary" type="button" disabled={seconds > 0 || Boolean(pending)} onClick={() => run('resend')}>
-            {pending === 'resend' ? <Pending>Sending…</Pending> : 'Resend code'}
-          </button>
-          {onBack && <button className="secondary" type="button" onClick={onBack}>Change email</button>}
-          {seconds > 0 && <p className="muted self-center text-sm">Resend available in {seconds}s</p>}
-        </div>
       </fieldset>
+      <div className="auth-link-row">
+        <button type="button" className="auth-link" disabled={seconds > 0 || Boolean(pending)} onClick={() => run('resend')}>
+          {pending === 'resend' ? 'Sending…' : seconds > 0 ? `Resend in ${seconds}s` : 'Resend code'}
+        </button>
+        {onBack && <button type="button" className="auth-link" onClick={onBack}>Change email</button>}
+      </div>
       {notice && <p className="notice" role="status">{notice}</p>}
+      {children}
     </form>
   );
 }

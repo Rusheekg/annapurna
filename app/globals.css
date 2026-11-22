@@ -445,9 +445,14 @@ button:disabled { cursor: wait; }
   border: 1px solid var(--line); border-radius: 10px; background: var(--paper);
 }
 .auth-field input:focus { border-color: var(--forest); background: var(--card); }
-.auth-field-icon { position: absolute; top: 15px; left: 14px; color: var(--muted); pointer-events: none; }
+.auth-field-icon { position: absolute; top: 50%; left: 14px; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
 .auth-field .password-toggle { top: 2px; right: 2px; }
 .auth-forgot { display: flex; justify-content: flex-end; margin-top: -6px; font-size: 14px; }
+.auth-link { display: inline-flex; align-items: center; min-height: 44px; padding: 0; border: 0; background: none; color: var(--forest); font: inherit; font-weight: 500; text-decoration: underline; text-underline-offset: 4px; }
+.auth-link:disabled { color: var(--muted); font-weight: 400; text-decoration: none; cursor: default; }
+.auth-link-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; margin-top: -4px; font-size: 14px; }
+.auth-code { min-height: 56px; text-align: center; padding-inline: 44px; font-size: 28px; font-weight: 500; letter-spacing: .5em; text-indent: .5em; }
+.auth-code::placeholder { letter-spacing: .5em; color: var(--line); }
 .auth-forgot a, .auth-switch a { display: inline-flex; align-items: center; min-height: 44px; color: var(--forest); font-weight: 500; text-decoration: underline; text-underline-offset: 4px; }
 .auth-submit { width: 100%; min-height: 48px; border-radius: 10px; }
 .auth-or { display: flex; align-items: center; gap: 14px; color: var(--muted); font-size: 13px; }

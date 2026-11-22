@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useRef, useState } from 'react';
+import { AuthCard } from '@/components/auth-layout';
 import { GoogleButton, IconInput, NameIcon, OrDivider } from '@/components/auth-parts';
 import CodeEntry from '@/components/code-entry';
 import PasswordField from '@/components/password-field';
@@ -49,40 +50,41 @@ export default function SignupForm({ next }) {
 
   if (sentTo) {
     return (
-      <div className="auth-form">
-        <h1 className="auth-heading">Check your <em>email</em></h1>
+      <AuthCard title={<>Check your <em>email</em></>}>
         <CodeEntry id="signup-code" email={sentTo}
           verify={async (code) => { await post({ action: 'verify', email: sentTo, code }); window.location.assign('/welcome'); }}
           resend={() => post({ action: 'resend', email: sentTo })}
-          onBack={() => { setSentTo(''); setPassword(''); }} />
-        <p className="muted text-sm">
-          No code? If this email already has an account, <Link href="/login" className="auth-inline">log in</Link> or{' '}
-          <Link href="/forgot" className="auth-inline">reset your password</Link>.
-        </p>
-      </div>
+          onBack={() => { setSentTo(''); setPassword(''); }}>
+          <p className="muted text-sm">
+            No code? If this email already has an account, <Link href="/login" className="auth-link">log in</Link> or{' '}
+            <Link href="/forgot" className="auth-link">reset your password</Link>.
+          </p>
+        </CodeEntry>
+      </AuthCard>
     );
   }
 
   const at = (field) => error?.field === field;
   return (
-    <form className="auth-form" noValidate onSubmit={submit}>
-      <h1 className="auth-heading">Create <em>Account</em></h1>
-      <p className="muted">Be a part of Annapurna’s mission.</p>
-      <fieldset className="grid gap-4" disabled={pending}>
-        <IconInput label="Full Name" icon={NameIcon} value={name} autoComplete="name" maxLength={100}
-          error={at('name')} errorId="signup-error" onChange={(event) => setName(event.target.value)} />
-        <IconInput label="Email Address" type="email" value={email} autoComplete="email" maxLength={254}
-          error={at('email')} errorId="signup-error" onChange={(event) => setEmail(event.target.value)} />
-        <PasswordField label="Password" value={password} onChange={setPassword} autoComplete="new-password"
-          error={at('password')} errorId="signup-error" hint="At least 8 characters, with letters and digits." />
-        <RequestError id="signup-error" error={error} retry={() => submit({ preventDefault() {} })} />
-        <button className="primary auth-submit" type="submit">
-          {pending ? <Pending>Creating account…</Pending> : 'Sign Up'}
-        </button>
-      </fieldset>
-      <OrDivider />
-      <GoogleButton next={next} disabled={pending} onError={setError} />
-      <p className="auth-switch">Already have an account? <Link href={next ? `/login?next=${encodeURIComponent(next)}` : '/login'}>Login</Link></p>
-    </form>
+    <AuthCard title={<>Create <em>Account</em></>}>
+      <form className="auth-form" noValidate onSubmit={submit}>
+        <p className="muted">Be a part of Annapurna’s mission.</p>
+        <fieldset className="grid gap-4" disabled={pending}>
+          <IconInput label="Full Name" icon={NameIcon} value={name} autoComplete="name" maxLength={100}
+            error={at('name')} errorId="signup-error" onChange={(event) => setName(event.target.value)} />
+          <IconInput label="Email Address" type="email" value={email} autoComplete="email" maxLength={254}
+            error={at('email')} errorId="signup-error" onChange={(event) => setEmail(event.target.value)} />
+          <PasswordField label="Password" value={password} onChange={setPassword} autoComplete="new-password"
+            error={at('password')} errorId="signup-error" hint="At least 8 characters, with letters and digits." />
+          <RequestError id="signup-error" error={error} retry={() => submit({ preventDefault() {} })} />
+          <button className="primary auth-submit" type="submit">
+            {pending ? <Pending>Creating account…</Pending> : 'Sign Up'}
+          </button>
+        </fieldset>
+        <OrDivider />
+        <GoogleButton next={next} disabled={pending} onError={setError} />
+        <p className="auth-switch">Already have an account? <Link className="auth-link" href={next ? `/login?next=${encodeURIComponent(next)}` : '/login'}>Login</Link></p>
+      </form>
+    </AuthCard>
   );
 }

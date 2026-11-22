@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useRef, useState } from 'react';
+import { AuthCard } from '@/components/auth-layout';
 import { IconInput } from '@/components/auth-parts';
 import CodeEntry from '@/components/code-entry';
 import PasswordField from '@/components/password-field';
@@ -58,42 +59,42 @@ export default function ForgotForm() {
 
   if (step === 'code') {
     return (
-      <div className="auth-form">
-        <h1 className="auth-heading">Enter your <em>code</em></h1>
+      <AuthCard title={<>Check your <em>email</em></>}>
         <CodeEntry id="reset-code" email={email}
           verify={async (code) => { await post({ action: 'verify', email, code }); setStep('password'); }}
           resend={() => post({ action: 'request', email })}
           onBack={() => setStep('email')} />
-      </div>
+      </AuthCard>
     );
   }
 
   const at = (field) => error?.field === field;
   return (
-    <form className="auth-form" noValidate onSubmit={submit}>
-      <h1 className="auth-heading">Reset your <em>password</em></h1>
-      <fieldset className="grid gap-4" disabled={pending}>
-        {step === 'email' ? (
-          <>
-            <p className="muted text-sm">We’ll email a six-digit code. You can request at most 3 resets a day.</p>
-            <IconInput label="Email Address" type="email" value={email} autoComplete="email" maxLength={254}
-              error={Boolean(error)} errorId="forgot-error" onChange={(event) => setEmail(event.target.value)} />
-          </>
-        ) : (
-          <>
-            <p>Code accepted. Choose a new password.</p>
-            <PasswordField label="New password" value={password} onChange={setPassword} autoComplete="new-password"
-              error={at('password')} errorId="forgot-error" hint="At least 8 characters, with letters and digits." />
-            <PasswordField label="Confirm new password" value={confirm} onChange={setConfirm} autoComplete="new-password"
-              error={at('confirm')} errorId="forgot-error" />
-          </>
-        )}
-        <RequestError id="forgot-error" error={error} retry={() => submit({ preventDefault() {} })} />
-        <button className="primary auth-submit" type="submit">
-          {pending ? <Pending>Working…</Pending> : step === 'email' ? 'Send code' : 'Set password and log in'}
-        </button>
-        <p className="auth-switch"><Link href="/login">Back to login</Link></p>
-      </fieldset>
-    </form>
+    <AuthCard title={step === 'email' ? <>Reset your <em>password</em></> : <>Set a new <em>password</em></>}>
+      <form className="auth-form" noValidate onSubmit={submit}>
+        <fieldset className="grid gap-4" disabled={pending}>
+          {step === 'email' ? (
+            <>
+              <p className="muted text-sm">We’ll email a six-digit code. You can request at most 3 resets a day.</p>
+              <IconInput label="Email Address" type="email" value={email} autoComplete="email" maxLength={254}
+                error={Boolean(error)} errorId="forgot-error" onChange={(event) => setEmail(event.target.value)} />
+            </>
+          ) : (
+            <>
+              <p>Code accepted. Choose a new password.</p>
+              <PasswordField label="New password" value={password} onChange={setPassword} autoComplete="new-password"
+                error={at('password')} errorId="forgot-error" hint="At least 8 characters, with letters and digits." />
+              <PasswordField label="Confirm new password" value={confirm} onChange={setConfirm} autoComplete="new-password"
+                error={at('confirm')} errorId="forgot-error" />
+            </>
+          )}
+          <RequestError id="forgot-error" error={error} retry={() => submit({ preventDefault() {} })} />
+          <button className="primary auth-submit" type="submit">
+            {pending ? <Pending>Working…</Pending> : step === 'email' ? 'Send code' : 'Set password and log in'}
+          </button>
+        </fieldset>
+        <p className="auth-switch"><Link className="auth-link" href="/login">Back to login</Link></p>
+      </form>
+    </AuthCard>
   );
 }
