@@ -17,7 +17,10 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${bodyFont.variable} ${headingFont.variable}`}>
-      <body>{children}</body>
+      <body>
+        {children}
+        <footer className="container site-footer">Demo uses synthetic data. No real addresses or personal details.</footer>
+      </body>
     </html>
   );
 }

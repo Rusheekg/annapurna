@@ -2,16 +2,43 @@
 
 import { database } from '../lib/db';
 import { validId } from '../lib/listings';
-import { distanceKm } from '../lib/matching';
+import { distanceKm, volunteerPickupRadiusKm } from '../lib/matching';
 import { runEscalation } from '../lib/escalation';
+import { settingKeys, settingsFromRows } from '../lib/settings';
 
 export async function readImpact() {
   try {
     const { rows } = await database().query(
-      `SELECT COALESCE(SUM(portions), 0) AS meals, COALESCE(SUM(quantity_kg), 0) AS kg
-       FROM public.listings WHERE status = 'delivered'`,
+      `WITH today AS (
+         SELECT (now() AT TIME ZONE 'Asia/Kolkata')::date AS day
+       ), daily AS (
+         SELECT (delivered_at AT TIME ZONE 'Asia/Kolkata')::date AS day, SUM(quantity_kg) AS kg
+         FROM public.listings, today
+         WHERE status = 'delivered'
+           AND delivered_at >= ((today.day - 6)::timestamp AT TIME ZONE 'Asia/Kolkata')
+           AND delivered_at < ((today.day + 1)::timestamp AT TIME ZONE 'Asia/Kolkata')
+         GROUP BY 1
+       ), totals AS (
+         SELECT COALESCE(SUM(portions) FILTER (WHERE status = 'delivered'), 0) AS meals,
+           COALESCE(SUM(quantity_kg) FILTER (WHERE status = 'delivered'), 0) AS kg,
+           COUNT(*) FILTER (WHERE status = 'delivered') AS delivered,
+           COUNT(*) FILTER (WHERE status = 'expired'
+             OR (status IN ('posted', 'claimed') AND pickup_by <= now())) AS expired,
+           AVG(EXTRACT(EPOCH FROM delivered_at - created_at) / 60)
+             FILTER (WHERE status = 'delivered' AND delivered_at >= created_at) AS "averageMinutes"
+         FROM public.listings
+       )
+       SELECT totals.*,
+         totals.kg * (SELECT value FROM public.settings WHERE key = 'co2e_per_kg') AS co2e,
+         ARRAY(SELECT row_to_json(s) FROM public.settings s WHERE key = ANY($1::text[])) AS settings,
+         ARRAY(SELECT json_build_object('day', (today.day - offsets.days)::text, 'kg', COALESCE(daily.kg, 0))
+           FROM today CROSS JOIN generate_series(0, 6) AS offsets(days)
+           LEFT JOIN daily ON daily.day = today.day - offsets.days
+           ORDER BY offsets.days DESC) AS days
+       FROM totals`,
+      [settingKeys],
     );
-    return rows[0];
+    return { ...rows[0], settings: settingsFromRows(rows[0].settings) };
   } catch (error) {
     console.error('Could not load impact:', error.message);
     return null;
@@ -41,7 +68,8 @@ export async function readWorkspaceListings(role, accountId) {
     JOIN public.receivers r ON r.id = l.receiver_id
     JOIN public.volunteers v ON v.id = $1
     WHERE l.volunteer_id = v.id OR (v.available AND l.volunteer_id IS NULL
-      AND l.status = 'claimed' AND l.pickup_method = 'volunteer' AND l.pickup_by > now())
+      AND l.status = 'claimed' AND l.pickup_method = 'volunteer' AND l.pickup_by > now()
+      AND ${distanceKm('v', 'd')} <= ${volunteerPickupRadiusKm})
     ORDER BY priority_pickup DESC NULLS LAST, CASE WHEN l.volunteer_id IS NULL THEN 0
       WHEN l.status IN ('claimed', 'collected') THEN 1 ELSE 2 END,
       pickup_distance_km, l.created_at DESC, l.id DESC
@@ -83,7 +111,8 @@ export async function readMapData(volunteerId) {
           WHERE (l.status = 'collected' AND l.volunteer_id = v.id)
              OR (l.status = 'claimed' AND l.pickup_by > now() AND (
                l.volunteer_id = v.id OR
-               (l.volunteer_id IS NULL AND v.available AND l.pickup_method = 'volunteer')
+               (l.volunteer_id IS NULL AND v.available AND l.pickup_method = 'volunteer'
+                 AND ${distanceKm('v', 'd')} <= ${volunteerPickupRadiusKm})
              ))
           ORDER BY (l.volunteer_id IS NULL), l.pickup_by, l.id
         ) job) AS routes

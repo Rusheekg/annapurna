@@ -1,9 +1,11 @@
 ﻿'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { Clock3, Tags, ShieldCheck } from 'lucide-react';
 import HomeLiveFeed from '@/components/home-live-feed';
+import SiteHeader from '@/components/site-header';
 import { LiveNotificationFeed } from '@/components/ui/live-notification-feed';
 import { readImpact, readWorkspaceListings } from './feed-data';
 import { useEffect, useRef, useState } from 'react';
@@ -117,7 +119,7 @@ function listingNotification(listing, role, accountId, pending) {
 const workspaceFeeds = {
   donor: ['My listings', 'No surplus posted yet.'],
   receiver: ['Listing offers', 'No offers for this account yet.'],
-  volunteer: ['Pickup jobs', 'No pickup jobs are available for this account.'],
+  volunteer: ['Pickup jobs', 'No assigned jobs or open pickups within 5 km.'],
 };
 
 function WorkspaceFeed({ role, accountId, revision = 0 }) {
@@ -399,7 +401,7 @@ function Landing({ onPost }) {
             <p className="hero-description">Annapurna connects surplus food from hostel messes to nearby shelters and community kitchens before it spoils.</p>
             <div className="hero-actions">
               <button className="primary" onClick={onPost}>Post surplus</button>
-              <a className="secondary" href="#impact">See impact</a>
+              <Link className="secondary" href="/impact">See impact</Link>
             </div>
             <dl id="impact" className="stats" aria-label="Annapurna impact" tabIndex={-1}>
               {[[impact?.meals, 'Meals served'], [impact?.kg, 'Kg saved']].map(([value, label]) => (
@@ -483,36 +485,29 @@ export default function Home() {
 
   return (
     <>
-      <header>
-        <p className="announcement">Synthetic demo data · Annapurna does not certify food safety</p>
-        <div className="container masthead">
-          <a href="/" className="brand" onClick={(event) => {
-            if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-            event.preventDefault();
-            setShowWorkspace(false);
-            window.scrollTo(0, 0);
-          }}>
-            <Image src="/brand/logo-mark.png" width={40} height={40} alt="" />
-            <span>Annapurna{!showWorkspace && <small>Where surplus finds purpose.</small>}</span>
-          </a>
-          <div className="role-switcher">
-            <label>View as<select value={showWorkspace ? selection.role : ''} onChange={(event) => {
-              const role = event.target.value;
-              openWorkspace(role, role === selection.role ? selection.id : people[role][0]?.id);
-            }} disabled={!people}>
-              <option value="" disabled>Choose a role</option>
-              {Object.entries(roles).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-            </select></label>
-            {people && (
-              <label>{showWorkspace ? roles[selection.role] : 'Demo'} account
-                <select value={selection.id ?? ''} onChange={(event) => openWorkspace(selection.role, Number(event.target.value))}>
-                  {people[selection.role].map(({ id, name }) => <option key={id} value={id}>{name}</option>)}
-                </select>
-              </label>
-            )}
-          </div>
+      <SiteHeader tagline={!showWorkspace} onBrandClick={(event) => {
+        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        event.preventDefault();
+        setShowWorkspace(false);
+        window.scrollTo(0, 0);
+      }}>
+        <div className="role-switcher">
+          <label>View as<select value={showWorkspace ? selection.role : ''} onChange={(event) => {
+            const role = event.target.value;
+            openWorkspace(role, role === selection.role ? selection.id : people[role][0]?.id);
+          }} disabled={!people}>
+            <option value="" disabled>Choose a role</option>
+            {Object.entries(roles).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select></label>
+          {people && (
+            <label>{showWorkspace ? roles[selection.role] : 'Demo'} account
+              <select value={selection.id ?? ''} onChange={(event) => openWorkspace(selection.role, Number(event.target.value))}>
+                {people[selection.role].map(({ id, name }) => <option key={id} value={id}>{name}</option>)}
+              </select>
+            </label>
+          )}
         </div>
-      </header>
+      </SiteHeader>
       {showWorkspace ? (
         <main className="container workspace">
           <h1>{roles[selection.role]} <em>workspace</em></h1>
@@ -533,7 +528,6 @@ export default function Home() {
       ) : (
         <Landing onPost={() => openWorkspace('donor', selection.role === 'donor' ? selection.id : people?.donor[0]?.id)} />
       )}
-      <footer className="container site-footer">Demo uses synthetic data. No real addresses or personal details.</footer>
     </>
   );
 }

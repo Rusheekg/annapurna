@@ -1,5 +1,6 @@
 import { database } from '@/lib/db';
 import { validId } from '@/lib/listings';
+import { distanceKm, volunteerPickupRadiusKm } from '@/lib/matching';
 
 const transitions = {
   claim: {
@@ -23,9 +24,10 @@ const transitions = {
     set: 'volunteer_id = $2',
     where: `l.status = 'claimed' AND l.pickup_by > now() AND l.pickup_method = 'volunteer'
       AND l.volunteer_id IS NULL AND EXISTS (
-        SELECT 1 FROM public.volunteers v WHERE v.id = $2 AND v.available
+        SELECT 1 FROM public.volunteers v JOIN public.donors d ON d.id = l.donor_id
+        WHERE v.id = $2 AND v.available AND ${distanceKm('v', 'd')} <= ${volunteerPickupRadiusKm}
       )`,
-    conflict: 'This pickup is already assigned, the pickup window closed, or this volunteer is unavailable.',
+    conflict: 'This pickup is assigned, closed, outside your 5 km pickup radius, or your account is unavailable.',
   },
   collect: {
     set: "status = 'collected', collected_at = now()",
