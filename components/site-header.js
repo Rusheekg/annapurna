@@ -1,7 +1,8 @@
 import Image from 'next/image';
 import Link from 'next/link';
+import { SavedAccountBell } from './notification-bell';
 
-export default function SiteHeader({ page, tagline, onBrandClick, children }) {
+export default function SiteHeader({ page, tagline, onBrandClick, notificationBell, children }) {
   return (
     <header>
       <p className="announcement">Synthetic demo data · Annapurna does not certify food safety</p>
@@ -14,7 +15,10 @@ export default function SiteHeader({ page, tagline, onBrandClick, children }) {
           <Link href="/impact" aria-current={page === 'impact' ? 'page' : undefined}>Impact</Link>
           <Link href="/settings" aria-current={page === 'settings' ? 'page' : undefined}>Settings</Link>
         </nav>
-        {children}
+        <div className="header-controls">
+          {notificationBell ?? <SavedAccountBell />}
+          {children}
+        </div>
       </div>
     </header>
   );

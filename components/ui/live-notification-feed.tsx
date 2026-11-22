@@ -68,6 +68,10 @@ export interface LiveNotificationFeedProps extends React.ComponentProps<"div"> {
   onOpen?: (id: string) => void;
   onAction?: (id: string, label: string) => void;
   onDismiss?: (id: string) => void;
+  readIds?: ReadonlySet<string>;
+  onRead?: (ids: string[]) => void;
+  dismissible?: boolean;
+  headerAction?: React.ReactNode;
 }
 
 interface Entry {
@@ -902,7 +906,7 @@ function NotificationCard({
   reduced: boolean;
   onOpen: () => void;
   onAction: (action: NotificationAction) => void;
-  onDismiss: () => void;
+  onDismiss?: () => void;
 }) {
   const [entered, setEntered] = React.useState(!entry.fresh || reduced);
   React.useEffect(() => {
@@ -963,7 +967,7 @@ function NotificationCard({
                   data-open
                   onClick={onOpen}
                   onKeyDown={(event) => {
-                    if (event.key !== "Delete" && event.key !== "Backspace") return;
+                    if (!onDismiss || (event.key !== "Delete" && event.key !== "Backspace")) return;
                     event.preventDefault();
                     onDismiss();
                   }}
@@ -1019,11 +1023,11 @@ function NotificationCard({
               <span
                 data-unread
                 aria-hidden
-                className={cx("absolute right-3.5 top-3.5 size-2 rounded-full transition-opacity group-hover:opacity-0", !item.accent && "bg-primary")}
+                className={cx("absolute right-3.5 top-3.5 size-2 rounded-full", Boolean(onDismiss) && "transition-opacity group-hover:opacity-0", !item.accent && "bg-primary")}
                 style={item.accent ? { background: item.accent } : undefined}
               />
             )}
-            <button
+            {onDismiss && <button
               type="button"
               data-dismiss
               aria-label={`Dismiss ${item.title}`}
@@ -1034,7 +1038,7 @@ function NotificationCard({
               className="absolute right-2 top-2 z-[2] grid size-6 place-items-center rounded-full text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-hover:opacity-100"
             >
               <Icon d={CLOSE} className="size-3.5" />
-            </button>
+            </button>}
           </article>
         </div>
       </div>
@@ -1054,6 +1058,10 @@ export function LiveNotificationFeed({
   onOpen,
   onAction,
   onDismiss,
+  readIds: controlledReadIds,
+  onRead,
+  dismissible = true,
+  headerAction,
   ref,
   className,
   onPointerEnter,
@@ -1065,7 +1073,8 @@ export function LiveNotificationFeed({
   const reduced = useReducedMotion();
   const startCount = autoplay ? Math.min(Math.max(0, Math.round(initial)), items.length) : items.length;
   const [entries, setEntries] = React.useState(() => items.slice(0, startCount).map((item) => staticEntry(item.id, 0)));
-  const [readIds, setReadIds] = React.useState(() => new Set(items.filter((item) => item.read).map((item) => item.id)));
+  const [localReadIds, setReadIds] = React.useState(() => new Set(items.filter((item) => item.read).map((item) => item.id)));
+  const readIds = controlledReadIds ?? localReadIds;
   const [done, setDone] = React.useState((): { [id: string]: string } => ({}));
   const [announcement, setAnnouncement] = React.useState("");
   const cursor = React.useRef(startCount);
@@ -1226,9 +1235,12 @@ export function LiveNotificationFeed({
     list.filter((item) => !previousIds.has(item.id)).forEach((item) => arrive(item.id));
   }, [showAll, itemsKey, restart, arrive]);
 
-  const markRead = (id: string) => setReadIds((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
+  function markRead(ids: string[]) {
+    if (onRead) onRead(ids);
+    else setReadIds((previous) => new Set([...previous, ...ids]));
+  }
 
-  const live = entries.filter((e) => !e.leaving);
+  const live = entries.filter((e) => !e.leaving && byId.has(e.id));
   const unread = live.filter((e) => !readIds.has(e.id)).length;
   const ordered = [...entries].reverse();
   const pause = (value: boolean) => {
@@ -1260,7 +1272,7 @@ export function LiveNotificationFeed({
       {...rest}
     >
       <div className="flex items-center gap-2 px-3 pb-2.5 pt-2">
-        <svg
+        {!headerAction && <svg
           ref={bellRef}
           viewBox="0 0 24 24"
           aria-hidden
@@ -1273,34 +1285,35 @@ export function LiveNotificationFeed({
           strokeLinejoin="round"
         >
           <path d={BELL} />
-        </svg>
-        <h2 className="text-sm font-semibold tracking-tight">{title}</h2>
-        <span
+        </svg>}
+        <h2 className="notification-feed-title">{title}</h2>
+        {!headerAction && <span
           data-count
           aria-label={`${unread} unread`}
           className={cx("min-w-5 rounded-full bg-foreground px-1.5 text-center text-[11px] font-semibold leading-5 text-background tabular-nums transition-opacity", unread === 0 && "opacity-0")}
         >
           {unread}
-        </span>
+        </span>}
         <div className="ml-auto flex items-center gap-0.5">
           <button
             type="button"
             data-read-all
             disabled={unread === 0}
-            onClick={() => setReadIds((prev) => new Set([...prev, ...live.map((e) => e.id)]))}
-            className="rounded-full px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
+            onClick={() => markRead(live.map((e) => e.id))}
+            className="whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
           >
             Read all
           </button>
-          <button
+          {dismissible && <button
             type="button"
             data-clear
             disabled={live.length === 0}
             onClick={clearAll}
-            className="rounded-full px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
+            className="whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
           >
             Clear
-          </button>
+          </button>}
+          {headerAction}
         </div>
       </div>
       <div className="relative">
@@ -1326,21 +1339,21 @@ export function LiveNotificationFeed({
                 done={done[entry.id]}
                 reduced={reduced}
                 onOpen={() => {
-                  markRead(entry.id);
+                  markRead([entry.id]);
                   setEntries((prev) => prev.map((e) => (e.key === entry.key ? { ...e, play: e.play + 1, fresh: false, delay: 0 } : e)));
                   handlers.current.onOpen?.(entry.id);
                 }}
                 onAction={(action) => {
-                  markRead(entry.id);
+                  markRead([entry.id]);
                   const handleAction = handlers.current.onAction;
                   if (handleAction) handleAction(entry.id, action.label);
                   else setDone((prev) => ({ ...prev, [entry.id]: action.done ?? action.label }));
                 }}
-                onDismiss={() => {
+                onDismiss={dismissible ? () => {
                   setEntries((prev) => prev.map((e) => (e.key === entry.key ? { ...e, leaving: true, leaveDelay: 0 } : e)));
                   removeKeys([entry.key], reduced ? 0 : LEAVE_MS);
                   handlers.current.onDismiss?.(entry.id);
-                }}
+                } : undefined}
               />
             );
           })}

@@ -7,9 +7,11 @@ import { Clock3, Tags, ShieldCheck } from 'lucide-react';
 import HomeLiveFeed from '@/components/home-live-feed';
 import SiteHeader from '@/components/site-header';
 import { LiveNotificationFeed } from '@/components/ui/live-notification-feed';
-import { readImpact, readWorkspaceListings } from './feed-data';
-import { useEffect, useRef, useState } from 'react';
-import { allergens, foods, handlingGuidance, maxPortions, minutesUntil, safetyNotice, storageLabels } from '../lib/listings';
+import { readImpact } from './feed-data';
+import { listingNotification, readJson, useAccountListings, workspaceFeeds } from '@/components/account-listings';
+import NotificationBell, { selectionKey } from '@/components/notification-bell';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { allergens, foods, maxPortions, safetyNotice, storageLabels } from '../lib/listings';
 
 const NeighbourhoodMap = dynamic(() => import('@/components/neighbourhood-map'), {
   ssr: false,
@@ -17,175 +19,10 @@ const NeighbourhoodMap = dynamic(() => import('@/components/neighbourhood-map'),
 });
 
 const roles = { donor: 'Donor', receiver: 'Receiver', volunteer: 'Volunteer' };
-const selectionKey = 'annapurna.selection';
 
-async function readJson(url, options) {
-  const response = await fetch(url, options);
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'Request failed.');
-  return data;
-}
-
-const deliverySteps = ['Posted', 'Claimed', 'Collected', 'Delivered'];
-const timestampFields = ['created_at', 'claimed_at', 'collected_at', 'delivered_at'];
-const workspaceActions = {
-  Claim: { action: 'claim', change: (accountId) => ({ status: 'claimed', receiver_id: accountId }) },
-  'Request volunteer': { action: 'requestVolunteer', change: () => ({ pickup_method: 'volunteer' }) },
-  'We’ll collect ourselves': { action: 'collectOurselves', change: () => ({ pickup_method: 'self' }) },
-  Accept: { action: 'accept', change: (accountId) => ({ volunteer_id: accountId }) },
-  'Mark collected': { action: 'collect', change: () => ({ status: 'collected' }) },
-  'Mark delivered': { action: 'deliver', change: () => ({ status: 'delivered' }) },
-};
-
-function actionsForListing(listing, role, accountId, pickupOpen) {
-  if (role === 'receiver') {
-    if (listing.status === 'posted' && pickupOpen) return [{ label: 'Claim', done: 'Claimed' }];
-    if (listing.receiver_id !== accountId) return [];
-    if (listing.status === 'claimed' && pickupOpen && !listing.pickup_method) {
-      return [{ label: 'Request volunteer' }, { label: 'We’ll collect ourselves' }];
-    }
-    if (listing.pickup_method !== 'self') return [];
-  } else if (role === 'volunteer') {
-    if (listing.status === 'claimed' && pickupOpen && !listing.volunteer_id) {
-      return [{ label: 'Accept', done: 'Accepted' }];
-    }
-    if (listing.volunteer_id !== accountId) return [];
-  } else {
-    return [];
-  }
-
-  if (listing.status === 'claimed' && pickupOpen) return [{ label: 'Mark collected' }];
-  if (listing.status === 'collected') return [{ label: 'Mark delivered' }];
-  return [];
-}
-
-function listingNotification(listing, role, accountId, pending) {
-  const expired = listing.status === 'expired';
-  const pickup = new Date(listing.pickup_by);
-  const minutes = minutesUntil(listing.pickup_by);
-  const active = listing.status === 'posted' || listing.status === 'claimed';
-  const pickupLabel = `Pickup by ${formatDate(pickup)}` +
-    (active ? minutes > 0 ? ` (${minutes} min left)` : ' (window closed)' : '');
-  const details = [
-    `${listing.portions} portions`,
-    `${Number(listing.quantity_kg)} kg`,
-    listing.veg ? 'Veg' : 'Non-veg',
-    storageLabels[listing.storage],
-    `Allergens: ${listing.allergens.join(', ') || 'None listed'}`,
-    pickupLabel,
-    handlingGuidance(listing.storage, listing.cooked_at, active),
-  ];
-  if (role === 'receiver') {
-    if (listing.pickup_method === 'volunteer') {
-      details.push(listing.volunteer_id ? 'Volunteer assigned' : 'Volunteer requested');
-    }
-    if (listing.pickup_method === 'self') details.push('Self pickup');
-  }
-  if (role === 'volunteer') {
-    details.unshift(`${Number(listing.pickup_distance_km).toFixed(1)} km to pickup`,
-      `Deliver to ${listing.receiver_name}`);
-    if (listing.status === 'claimed' && listing.volunteer_id === accountId) details.push('Accepted');
-  }
-  if (pending) details.push('Saving…');
-
-  const timeline = deliverySteps.flatMap((label, index) => {
-    const value = listing[timestampFields[index]];
-    return value ? [{ label, dateTime: new Date(value).toISOString(), text: formatDate(value) }] : [];
-  });
-  if (expired && listing.expired_at) {
-    timeline.push({ label: 'Expired', dateTime: new Date(listing.expired_at).toISOString(), text: formatDate(listing.expired_at) });
-  }
-
-  return {
-    id: String(listing.id),
-    kind: 'delivery',
-    app: listing.donor_name || 'Annapurna',
-    title: listing.food_items,
-    body: listing.match_reason || details.join(' · '),
-    details: listing.match_reason ? details.join(' · ') : undefined,
-    safetyNotice,
-    warning: expired ? 'Expired — do not send this food.' : undefined,
-    priority: role === 'volunteer' && listing.priority_pickup && !listing.volunteer_id && listing.status === 'claimed'
-      ? 'Priority pickup' : undefined,
-    timeline,
-    actions: pending ? [] : actionsForListing(listing, role, accountId, minutes > 0),
-    status: listing.status,
-    accent: active && minutes > 0 && minutes <= 30 ? 'var(--amber)' : 'var(--forest)',
-    steps: expired ? ['Expired'] : deliverySteps,
-    step: expired ? 0 : deliverySteps.findIndex((step) => step.toLowerCase() === listing.status),
-  };
-}
-
-const workspaceFeeds = {
-  donor: ['My listings', 'No surplus posted yet.'],
-  receiver: ['Listing offers', 'No offers for this account yet.'],
-  volunteer: ['Pickup jobs', 'No assigned jobs or open pickups within 5 km.'],
-};
-
-function WorkspaceFeed({ role, accountId, revision = 0 }) {
-  const [listings, setListings] = useState(null);
-  const [error, setError] = useState('');
-  const [actionErrors, setActionErrors] = useState({});
-  const [optimistic, setOptimistic] = useState({});
-  const inFlight = useRef(new Set());
-  const writeVersion = useRef(0);
+function WorkspaceFeed({ role, accountId, listingsState }) {
+  const { listings, error, actionErrors, optimistic, act } = listingsState;
   const [title, empty] = workspaceFeeds[role];
-
-  useEffect(() => {
-    const controller = new AbortController();
-    let loading = false;
-    async function refresh() {
-      if (loading) return;
-      loading = true;
-      const version = writeVersion.current;
-      try {
-        const data = role === 'donor'
-          ? await readJson('/api/listings?donorId=' + accountId, { signal: controller.signal })
-          : await readWorkspaceListings(role, accountId);
-        if (controller.signal.aborted || version !== writeVersion.current) return;
-        if (!data) throw new Error('Could not load ' + title.toLowerCase() + '.');
-        setListings(data);
-        setError('');
-      } catch (failure) {
-        if (!controller.signal.aborted && version === writeVersion.current) setError(failure.message);
-      } finally {
-        loading = false;
-      }
-    }
-    refresh();
-    const timer = setInterval(refresh, 5000);
-    return () => {
-      controller.abort();
-      clearInterval(timer);
-    };
-  }, [role, accountId, revision, title]);
-
-  async function act(id, label) {
-    const { action, change } = workspaceActions[label];
-    if (inFlight.current.has(id)) return;
-    inFlight.current.add(id);
-    writeVersion.current += 1;
-    setOptimistic((previous) => ({ ...previous, [id]: change(accountId) }));
-    setActionErrors((previous) => ({ ...previous, [id]: '' }));
-
-    try {
-      const listing = await readJson('/api/listings/transition', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, listingId: Number(id), accountId, role }),
-      });
-      setListings((previous) => previous.map((item) => item.id === listing.id ? { ...item, ...listing } : item));
-    } catch (failure) {
-      setActionErrors((previous) => ({
-        ...previous,
-        [id]: `Could not complete “${label}”. ${failure.message}`,
-      }));
-    } finally {
-      writeVersion.current += 1;
-      inFlight.current.delete(id);
-      setOptimistic(({ [id]: pending, ...others }) => others);
-    }
-  }
 
   return (
     <section className="min-w-0" aria-label={title}>
@@ -212,18 +49,13 @@ function WorkspaceFeed({ role, accountId, revision = 0 }) {
   );
 }
 
-function DonorListings({ donorId, kgPerMeal }) {
-  const [revision, setRevision] = useState(0);
+function DonorListings({ donorId, kgPerMeal, listingsState, onPosted }) {
   return (
     <div className="workspace-grid">
-      <PostForm donorId={donorId} kgPerMeal={kgPerMeal} onPosted={() => setRevision((value) => value + 1)} />
-      <WorkspaceFeed role="donor" accountId={donorId} revision={revision} />
+      <PostForm donorId={donorId} kgPerMeal={kgPerMeal} onPosted={onPosted} />
+      <WorkspaceFeed role="donor" accountId={donorId} listingsState={listingsState} />
     </div>
   );
-}
-
-function formatDate(value) {
-  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
 }
 
 function localInputTime(date) {
@@ -413,10 +245,8 @@ function Landing({ onPost }) {
             </dl>
             {impact === null && <p className="muted mt-2" role="status">Impact totals are temporarily unavailable.</p>}
           </div>
-          <div className="hero-feed">
-            <span className="feed-circle" aria-hidden="true" />
-            <Image className="feed-mark" src="/brand/logo-mark.png" width={120} height={120} alt="" />
-            <HomeLiveFeed />
+          <div className="hero-emblem">
+            <Image src="/brand/logo-mark.png" width={320} height={320} alt="" loading="eager" />
           </div>
         </div>
         <div className="gold-rule" aria-hidden="true" />
@@ -432,15 +262,20 @@ function Landing({ onPost }) {
         </ul>
       </section>
       <section className="container how-section" aria-labelledby="how-title">
-        <h2 id="how-title">How it <em>works</em>.</h2>
-        <ol className="steps-grid">
-          {howItWorks.map(([title, description], index) => (
-            <li key={title}>
-              <span className="step-number">{String(index + 1).padStart(2, '0')}</span>
-              <h3>{title}</h3><p>{description}</p>
-            </li>
-          ))}
-        </ol>
+        <div>
+          <h2 id="how-title">How it <em>works</em>.</h2>
+          <ol className="how-steps" role="list">
+            {howItWorks.map(([title, description]) => (
+              <li key={title}>
+                <h3>{title}</h3><p>{description}</p>
+              </li>
+            ))}
+          </ol>
+        </div>
+        <div className="how-feed">
+          <p className="eyebrow">Right now, live near you</p>
+          <HomeLiveFeed />
+        </div>
       </section>
     </main>
   );
@@ -452,6 +287,7 @@ export default function Home() {
   const [showWorkspace, setShowWorkspace] = useState(false);
   const [error, setError] = useState('');
   const requestedRole = useRef(null);
+  const focusControl = useRef(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -472,9 +308,12 @@ export default function Home() {
     return () => controller.abort();
   }, []);
 
-  function openWorkspace(role, id) {
+  function openWorkspace(role, id, control) {
     requestedRole.current = role;
     if (people) {
+      if (control && control === document.activeElement && (role !== selection.role || id !== selection.id)) {
+        focusControl.current = control.name;
+      }
       const next = { role, id };
       setSelection(next);
       try { localStorage.setItem(selectionKey, JSON.stringify(next)); } catch {}
@@ -483,25 +322,43 @@ export default function Home() {
     window.scrollTo(0, 0);
   }
 
+  return <AccountView key={`${selection.role}:${selection.id}`} {...{
+    people, selection, showWorkspace, setShowWorkspace, error, openWorkspace, focusControl,
+  }} />;
+}
+
+function AccountView({ people, selection, showWorkspace, setShowWorkspace, error, openWorkspace, focusControl }) {
+  const [revision, setRevision] = useState(0);
+  const listingsState = useAccountListings(selection.role, selection.id, revision);
+  const controls = useRef(null);
+
+  useLayoutEffect(() => {
+    if (!focusControl.current) return;
+    controls.current?.querySelector(`select[name="${focusControl.current}"]`)?.focus({ preventScroll: true });
+    focusControl.current = null;
+  }, [focusControl]);
+
   return (
     <>
-      <SiteHeader tagline={!showWorkspace} onBrandClick={(event) => {
+      <SiteHeader tagline={!showWorkspace} notificationBell={
+        <NotificationBell role={selection.role} accountId={selection.id} listingsState={listingsState} loading={!people && !error} />
+      } onBrandClick={(event) => {
         if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
         event.preventDefault();
         setShowWorkspace(false);
         window.scrollTo(0, 0);
       }}>
-        <div className="role-switcher">
-          <label>View as<select value={showWorkspace ? selection.role : ''} onChange={(event) => {
+        <div className="role-switcher" ref={controls}>
+          <label>View as<select name="role" value={showWorkspace ? selection.role : ''} onChange={(event) => {
             const role = event.target.value;
-            openWorkspace(role, role === selection.role ? selection.id : people[role][0]?.id);
+            openWorkspace(role, role === selection.role ? selection.id : people[role][0]?.id, event.currentTarget);
           }} disabled={!people}>
             <option value="" disabled>Choose a role</option>
             {Object.entries(roles).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select></label>
           {people && (
             <label>{showWorkspace ? roles[selection.role] : 'Demo'} account
-              <select value={selection.id ?? ''} onChange={(event) => openWorkspace(selection.role, Number(event.target.value))}>
+              <select name="account" value={selection.id ?? ''} onChange={(event) => openWorkspace(selection.role, Number(event.target.value), event.currentTarget)}>
                 {people[selection.role].map(({ id, name }) => <option key={id} value={id}>{name}</option>)}
               </select>
             </label>
@@ -515,11 +372,12 @@ export default function Home() {
           {!people && !error && <p>Loading demo accounts…</p>}
           {people && !selection.id && <p>No demo accounts are available for this role.</p>}
           {people && selection.id && (selection.role === 'donor' ? (
-            <DonorListings key={selection.id} donorId={selection.id} kgPerMeal={people.kgPerMeal} />
+            <DonorListings donorId={selection.id} kgPerMeal={people.kgPerMeal} listingsState={listingsState}
+              onPosted={() => setRevision((value) => value + 1)} />
           ) : (
             <>
               <p className="eyebrow workspace-account">{people[selection.role].find((person) => person.id === selection.id)?.name}</p>
-              <WorkspaceFeed key={`${selection.role}-${selection.id}`} role={selection.role} accountId={selection.id} />
+              <WorkspaceFeed role={selection.role} accountId={selection.id} listingsState={listingsState} />
             </>
           ))}
           {people && selection.id && <NeighbourhoodMap key={selection.role === 'volunteer' ? selection.id : 'all'}

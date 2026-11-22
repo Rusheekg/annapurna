@@ -52,8 +52,8 @@ No gradients, no drop shadows heavier than `0 1px 2px rgba(0,0,0,0.04)`.
 ## 5. Home page (`/`)
 Two-column hero on cream background (stacks on mobile):
 - Left: eyebrow "● FOOD RESCUE, HOSTEL TO SHELTER"; heading "Where surplus finds *purpose*." (italic word in sage); one muted sentence: "Annapurna connects surplus food from hostel messes to nearby shelters and community kitchens before it spoils."; primary button "Post surplus →" (goes to donor view) and secondary "See impact"; two stat pairs below (meals served, kg saved — read real numbers from the database).
-- Right: the animated live feed `components/home-live-feed.tsx` (see section 7), with the logo mark `/brand/logo-mark.png` at about 120px peeking from behind its top-right corner and a thin gold circle line behind both.
-- Then the trust strip, then a section "How it *works*." with three numbered steps: Post · Match · Deliver. Between hero and trust strip, a thin centred gold rule (like the logo's divider lines).
+- The right column centres the fully visible logo mark `/brand/logo-mark.png` inside a thin gold circle. The mark is about 320px on desktop.
+- A thin centred gold rule separates the hero from the trust strip. Below the strip, "How it *works*." introduces three stacked rows on the left (Post, Match, Deliver). The right column is at most 460px wide and shows the "● RIGHT NOW, LIVE NEAR YOU" eyebrow above the animated demo feed. Below 900px, the demo feed follows the steps in a single column.
 
 ## 6. Don'ts
 - Don't stretch, recolour or crop the logo mark further. Don't place it on dark backgrounds (it has a cream fill).
@@ -75,7 +75,11 @@ A ready-made animated feed component (TypeScript, Tailwind, shadcn-style colour 
 5. The `components/ui/` folder is the standard place for reusable UI building blocks (shadcn convention). Keep it; future UI components go there too.
 
 **Where to use it:**
-- **Home hero** (`components/home-live-feed.tsx`): autoplaying demo with synthetic events. Already written; just place it.
+- **How it works** shows the autoplaying synthetic demo from `components/home-live-feed.tsx`.
+- The **site header** places a lucide Bell to the left of the role switcher. It uses a 44px target and shows the account's unread count when it is above zero. Newly arrived items trigger one wiggle unless reduced motion is enabled.
+- The **bell panel** is about 400px wide and capped at 70vh, with a full-width sheet below 640px. Show offers and Claim for receivers, listing status updates for donors, and pickup jobs with Accept, Mark collected, and Mark delivered for volunteers. Use the existing five-second polling and listing actions. Escape, outside click, and the close button dismiss the panel and restore focus to the bell.
+- Opening a notification or using its action marks it read. **Read all** marks the active account's current notifications read. Store read IDs in localStorage per role and account so they survive polling and refreshes.
+- Set the **feed title** in DM Sans at 14px and weight 600, scoped to the feed. Keep Read all and Clear on single lines wherever those controls are shown.
 - **Receiver workspace:** show real offers as the feed with `autoplay={false}`. Each offer = `kind: "delivery"`, `steps: ["Posted","Claimed","Collected","Delivered"]`, `step` = current status index, `body` = match reason text, `actions: [{label:"Claim", done:"Claimed"}]`. In `onAction(id, "Claim")` call the existing claim API. Keep polling every 5 s and pass the updated list; new items animate in automatically.
 - **Donor workspace:** "My listings" as the same delivery feed (no actions), so donors watch status move.
 - **Volunteer workspace:** pickup jobs as delivery items with `actions: [{label:"Accept", done:"Accepted"}]`, then "Mark collected" / "Mark delivered".

@@ -4,7 +4,7 @@ import { LiveNotificationFeed } from "@/components/ui/live-notification-feed";
 import type { LiveNotification } from "@/components/ui/live-notification-feed";
 import { safetyNotice } from "@/lib/listings";
 
-// Synthetic demo events for the home page hero. All names are invented.
+// Synthetic demo events for the home page. All names are invented.
 const FOREST = "#22392B";
 const SAGE = "#7A9A6A";
 const GOLD = "#C9973B";
@@ -95,7 +95,7 @@ export default function HomeLiveFeed() {
       interval={2200}
       loop
       height="420px"
-      className="relative max-w-md"
+      className="relative"
     />
   );
 }
