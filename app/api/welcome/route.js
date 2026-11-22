@@ -1,63 +1,57 @@
-import { accountTables, roleForbidden, writeIdentity } from '@/lib/auth';
+import { roleForbidden, writeIdentity } from '@/lib/auth';
 import { errorResponse, serverFailure } from '@/lib/api-errors';
-import { validId } from '@/lib/listings';
 import { demoEnabled } from '@/lib/onboarding';
 import { invalidField } from '@/lib/request-errors';
 import { withTransaction } from '@/lib/transaction';
 
-const accountInserts = {
+const inserts = {
   donor: "INSERT INTO public.donors (name, lat, lng, type) VALUES ($1, $2, $3, 'canteen') RETURNING id",
-  receiver: "INSERT INTO public.receivers (name, lat, lng, daily_need_meals, type, can_store_chilled) VALUES ($1, $2, $3, $4, 'community_kitchen', $5) RETURNING id",
   volunteer: 'INSERT INTO public.volunteers (name, lat, lng, available) VALUES ($1, $2, $3, true) RETURNING id',
 };
+const tables = { donor: 'donors', volunteer: 'volunteers' };
 
+// First sign-in: a display name and an area create the user's donor and volunteer records.
 export async function POST(request) {
   try {
     const { user, response } = await writeIdentity({ needsProfile: false });
     if (response) return response;
     const body = await request.json().catch(() => null);
-    const role = body?.role;
-    if (typeof role !== 'string' || !Object.hasOwn(accountTables, role)) {
-      return errorResponse(400, invalidField('role', 'Choose a role to continue.'));
-    }
-    const demoId = body.demoId;
-    const linking = demoId != null;
-    if (linking && !demoEnabled()) return errorResponse(403, roleForbidden);
-    if (linking && !validId(demoId)) return errorResponse(400, invalidField('demoId', 'Choose an available demo organisation.'));
-    const name = typeof body.name === 'string' ? body.name.trim() : '';
-    const { lat, lng, dailyNeed, canStoreChilled } = body;
-    if (!linking) {
-      if (!name || name.length > 100) return errorResponse(400, invalidField('name', 'Enter a name of up to 100 characters.'));
+    const demo = body?.demo === true;
+    if (demo && !demoEnabled()) return errorResponse(403, roleForbidden);
+    const name = typeof body?.name === 'string' ? body.name.trim() : '';
+    const { lat, lng } = body ?? {};
+    if (!demo) {
+      if (!name || name.length > 100) return errorResponse(400, invalidField('name', 'Enter a display name of up to 100 characters.'));
       if (!Number.isFinite(lat) || Math.abs(lat) > 90 || !Number.isFinite(lng) || Math.abs(lng) > 180) {
-        return errorResponse(400, invalidField('location', 'Choose a location on the map.'));
-      }
-      if (role === 'receiver' && (!Number.isInteger(dailyNeed) || dailyNeed < 1 || dailyNeed > 2147483647)) {
-        return errorResponse(400, invalidField('dailyNeed', 'Enter a positive whole number of meals.'));
+        return errorResponse(400, invalidField('location', 'Choose your area on the map.'));
       }
     }
 
     return await withTransaction(async (client) => {
       await client.query('SELECT pg_advisory_xact_lock(450832, hashtext($1))', [user.id]);
-      if ((await client.query('SELECT 1 FROM public.profiles WHERE user_id = $1', [user.id])).rowCount) {
-        return errorResponse(409, { code: 'ALREADY_ONBOARDED', message: 'Your account is already set up. Open your workspace.' });
+      const { rows: held } = await client.query('SELECT role FROM public.user_roles WHERE user_id = $1', [user.id]);
+      const missing = Object.keys(inserts).filter((role) => !held.some((item) => item.role === role));
+      if (!missing.length) {
+        return errorResponse(409, { code: 'ALREADY_ONBOARDED', message: 'Your account is already set up.' });
       }
-      let id = demoId;
-      if (linking) {
-        const { rowCount } = await client.query(
-          `SELECT id FROM public.${accountTables[role]} WHERE id = $1 AND is_demo FOR UPDATE`, [demoId],
-        );
-        const linked = rowCount && (await client.query(
-          'SELECT 1 FROM public.profiles WHERE role = $1 AND account_id = $2', [role, demoId],
-        )).rowCount;
-        if (!rowCount || linked) return errorResponse(409, {
-          code: 'DEMO_UNAVAILABLE', field: 'demoId', message: 'That demo organisation is unavailable. Choose another or create your own.',
-        });
-      } else {
-        const args = role === 'receiver' ? [name, lat, lng, dailyNeed, canStoreChilled === true] : [name, lat, lng];
-        const { rows: [account] } = await client.query(accountInserts[role], args);
-        id = account.id;
+      for (const role of missing) {
+        let id;
+        if (demo) {
+          // Link the first demo record nobody has taken yet.
+          const { rows: [free] } = await client.query(
+            `SELECT a.id FROM public.${tables[role]} a
+             WHERE a.is_demo AND NOT EXISTS (SELECT 1 FROM public.user_roles u WHERE u.role = $1 AND u.account_id = a.id)
+             ORDER BY a.id LIMIT 1 FOR UPDATE SKIP LOCKED`, [role],
+          );
+          if (!free) return errorResponse(409, {
+            code: 'DEMO_UNAVAILABLE', message: 'No demo identity is free right now. Create your own instead.',
+          });
+          id = free.id;
+        } else {
+          id = (await client.query(inserts[role], [name, lat, lng])).rows[0].id;
+        }
+        await client.query('INSERT INTO public.user_roles (user_id, role, account_id) VALUES ($1, $2, $3)', [user.id, role, id]);
       }
-      await client.query('INSERT INTO public.profiles (user_id, role, account_id) VALUES ($1, $2, $3)', [user.id, role, id]);
       return Response.json({ ok: true }, { status: 201 });
     });
   } catch (error) {

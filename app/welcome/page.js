@@ -1,17 +1,17 @@
 import { redirect } from 'next/navigation';
 import SiteHeader from '@/components/site-header';
 import { getIdentity } from '@/lib/auth';
-import { availableDemoAccounts } from '@/lib/onboarding';
+import { demoEnabled } from '@/lib/onboarding';
 import WelcomeForm from './welcome-form';
 
 export default async function WelcomePage() {
-  const { user, profile } = await getIdentity();
+  const { user, ready } = await getIdentity();
   if (!user) redirect('/login');
-  if (profile) redirect('/workspace');
-  const demo = await availableDemoAccounts();
+  if (ready) redirect('/post');
+  const demo = demoEnabled();
   return (
     <>
-      <SiteHeader signedIn demo={Boolean(demo)} />
+      <SiteHeader signedIn demo={demo} />
       <main className="container workspace">
         <p className="eyebrow mb-3">Account setup</p>
         <h1>Make yourself at <em>home</em>.</h1>

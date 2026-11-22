@@ -60,9 +60,9 @@ function SavedChart({ days }) {
 }
 
 export default async function ImpactPage() {
-  const [impact, { user, profile }] = await Promise.all([readImpact(), getIdentity()]);
+  const [impact, { user, accounts, ready }] = await Promise.all([readImpact(), getIdentity()]);
   return (
-    <ImpactFrame session={{ signedIn: Boolean(user), profile, demo: demoEnabled() }} editable={isAdmin(user)}>
+    <ImpactFrame session={{ signedIn: Boolean(user), accounts: ready ? accounts : null, userId: user?.id, demo: demoEnabled() }} editable={isAdmin(user)}>
         {!impact.error ? (
           <>
             <div className="impact-metrics">

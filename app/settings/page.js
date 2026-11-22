@@ -10,12 +10,12 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Settings · Annapurna' };
 
 export default async function SettingsPage() {
-  const { user, profile } = await getIdentity();
+  const { user, accounts, ready } = await getIdentity();
   let content;
   try {
     content = <SettingsForm initialValues={await readSettings()} editable={isAdmin(user)} />;
   } catch (error) {
     content = <RouteFeedback error={serverFailure('Load assumptions', error)} />;
   }
-  return <SettingsFrame session={{ signedIn: Boolean(user), profile, demo: demoEnabled() }}>{content}</SettingsFrame>;
+  return <SettingsFrame session={{ signedIn: Boolean(user), accounts: ready ? accounts : null, userId: user?.id, demo: demoEnabled() }}>{content}</SettingsFrame>;
 }

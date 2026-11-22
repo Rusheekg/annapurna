@@ -4,7 +4,7 @@ import { insertListingAndOffers } from '../../../lib/matching';
 import { runEscalation } from '../../../lib/escalation';
 import { errorResponse, serverFailure } from '@/lib/api-errors';
 import { expiredMessage, invalidField, missingAccount } from '@/lib/request-errors';
-import { roleForbidden, workspaceIdentity, writeIdentity } from '@/lib/auth';
+import { workspaceIdentity, writeIdentity } from '@/lib/auth';
 import { withTransaction } from '@/lib/transaction';
 
 const hour = 60 * 60 * 1000;
@@ -16,10 +16,9 @@ function invalid(field, message) {
 
 export async function GET() {
   try {
-    const { profile, response } = await workspaceIdentity();
+    const { accounts, response } = await workspaceIdentity();
     if (response) return response;
-    if (profile.role !== 'donor') return errorResponse(403, roleForbidden);
-    const donorId = profile.id;
+    const donorId = accounts.donor;
     await runEscalation();
     if (!(await database().query('SELECT 1 FROM public.donors WHERE id = $1', [donorId])).rows.length) {
       return errorResponse(404, missingAccount);
@@ -106,10 +105,9 @@ async function post(request, donorId) {
 
 export async function POST(request) {
   try {
-    const { profile, response } = await writeIdentity();
+    const { accounts, response } = await writeIdentity();
     if (response) return response;
-    if (profile.role !== 'donor') return errorResponse(403, roleForbidden);
-    return await post(request, profile.id);
+    return await post(request, accounts.donor);
   } catch (error) {
     return errorResponse(503, serverFailure('Post surplus', error, true));
   }

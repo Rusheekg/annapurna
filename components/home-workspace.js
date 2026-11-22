@@ -13,7 +13,8 @@ import { networkError, readJson } from '@/lib/client-requests';
 import { invalidField } from '@/lib/request-errors';
 import { FeedSkeleton, Pending, RequestError } from '@/components/request-feedback';
 import MissingPage from '@/components/missing-page';
-import NotificationBell from '@/components/notification-bell';
+import NotificationBell, { useAccountSources } from '@/components/notification-bell';
+import ReceiverSetup from '@/components/receiver-setup';
 import { useEffect, useRef, useState } from 'react';
 import { allergens, foods, maxPortions, safetyNotice, storageLabels } from '../lib/listings';
 
@@ -21,8 +22,6 @@ const NeighbourhoodMap = dynamic(() => import('@/components/neighbourhood-map'),
   ssr: false,
   loading: () => <p className="muted mt-6" role="status">Loading map…</p>,
 });
-
-const roles = { donor: 'Donor', receiver: 'Receiver', volunteer: 'Volunteer' };
 
 function WorkspaceFeed({ role, accountId, listingsState }) {
   const { listings, error, actionErrors, optimistic, act, retry } = listingsState;
@@ -232,7 +231,7 @@ const howItWorks = [
   ['Deliver', 'Volunteers collect the food and bring it to the receiving kitchen.'],
 ];
 
-export function Landing({ profile, demo }) {
+export function Landing({ demo }) {
   const [impact, setImpact] = useState(undefined);
   const [impactError, setImpactError] = useState(null);
   const [attempt, setAttempt] = useState(0);
@@ -259,7 +258,7 @@ export function Landing({ profile, demo }) {
             <h1 id="hero-title">Where surplus<br className="desktop-break" />{' '}finds <em>purpose</em>.</h1>
             <p className="hero-description">Annapurna connects surplus food from hostel messes to nearby shelters and community kitchens before it spoils.</p>
             <div className="hero-actions">
-              <Link className="primary" href="/workspace">{profile && profile.role !== 'donor' ? 'My workspace' : 'Post surplus'}</Link>
+              <Link className="primary" href="/post">Post surplus</Link>
               <Link className="secondary" href="/impact">See impact</Link>
             </div>
             <dl id="impact" className="stats" aria-label="Annapurna impact" tabIndex={-1}>
@@ -308,28 +307,43 @@ export function Landing({ profile, demo }) {
   );
 }
 
-export default function HomeWorkspace({ profile, name, kgPerMeal, demo }) {
-  const [revision, setRevision] = useState(0);
-  const { role, id } = profile;
-  const listingsState = useAccountListings(role, id, revision);
+const tabRoles = { post: 'donor', receive: 'receiver', volunteer: 'volunteer' };
+const tabHeadings = { post: ['Post', 'surplus'], receive: ['Receive', 'offers'], volunteer: ['Volunteer', 'pickups'] };
 
-  if (listingsState.error?.code === 'NOT_FOUND' ||
-      Object.values(listingsState.actionErrors).some((failure) => failure?.error?.code === 'NOT_FOUND')) {
+export default function AccountWorkspace({ tab, userId, accounts, name, area, kgPerMeal, demo, demoReceivers }) {
+  const [revision, setRevision] = useState(0);
+  const sources = useAccountSources(accounts, revision);
+  const role = tabRoles[tab];
+  const current = sources[role];
+
+  if (current?.error?.code === 'NOT_FOUND' ||
+      Object.values(current?.actionErrors ?? {}).some((failure) => failure?.error?.code === 'NOT_FOUND')) {
     return <MissingPage />;
   }
 
+  const [lead, accent] = tabHeadings[tab];
   return (
     <>
-      <SiteHeader page="workspace" signedIn profile={profile} demo={demo}
-        notificationBell={<NotificationBell role={role} accountId={id} listingsState={listingsState} />} />
+      <SiteHeader page={tab} signedIn accounts={accounts} userId={userId} demo={demo}
+        notificationBell={<NotificationBell userId={userId} sources={sources} />} />
       <main className="container workspace">
-        <h1>{roles[role]} <em>workspace</em></h1>
-        <p className="eyebrow workspace-account">{name}</p>
-        {role === 'donor'
-          ? <DonorListings donorId={id} kgPerMeal={kgPerMeal} listingsState={listingsState}
-              onPosted={() => setRevision((value) => value + 1)} />
-          : <WorkspaceFeed role={role} accountId={id} listingsState={listingsState} />}
-        <NeighbourhoodMap />
+        {role === 'receiver' && !accounts.receiver ? (
+          <>
+            <p className="eyebrow mb-3">First time receiving</p>
+            <h1>Who are you receiving <em>for</em>?</h1>
+            <ReceiverSetup area={area} demoReceivers={demoReceivers} />
+          </>
+        ) : (
+          <>
+            <h1>{lead} <em>{accent}</em></h1>
+            <p className="eyebrow workspace-account">{name}</p>
+            {role === 'donor'
+              ? <DonorListings donorId={accounts.donor} kgPerMeal={kgPerMeal} listingsState={current}
+                  onPosted={() => setRevision((value) => value + 1)} />
+              : <WorkspaceFeed role={role} accountId={accounts[role]} listingsState={current} />}
+            <NeighbourhoodMap includeRoutes={role === 'volunteer'} />
+          </>
+        )}
       </main>
     </>
   );

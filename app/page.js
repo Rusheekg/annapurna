@@ -9,13 +9,13 @@ export default async function HomePage({ searchParams }) {
   if (listingId !== undefined) {
     redirect(`/workspace?listingId=${encodeURIComponent(typeof listingId === 'string' ? listingId : '')}`);
   }
-  if (view) redirect('/workspace');
-  const { user, profile } = await getIdentity();
+  if (view) redirect('/post');
+  const { user, accounts, ready } = await getIdentity();
   const demo = demoEnabled();
   return (
     <>
-      <SiteHeader tagline signedIn={Boolean(user)} profile={profile} demo={demo} />
-      <Landing profile={profile} demo={demo} />
+      <SiteHeader tagline signedIn={Boolean(user)} accounts={ready ? accounts : null} userId={user?.id} demo={demo} />
+      <Landing demo={demo} />
     </>
   );
 }

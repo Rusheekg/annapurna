@@ -5,8 +5,8 @@ import { demoEnabled } from '@/lib/onboarding';
 import LoginForm from './login-form';
 
 export default async function LoginPage() {
-  const { user, profile } = await getIdentity();
-  if (user) redirect(profile ? '/workspace' : '/welcome');
+  const { user, ready } = await getIdentity();
+  if (user) redirect(ready ? '/post' : '/welcome');
   return (
     <>
       <SiteHeader demo={demoEnabled()} />

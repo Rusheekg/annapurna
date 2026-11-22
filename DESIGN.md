@@ -29,7 +29,7 @@ No gradients, no drop shadows heavier than `0 1px 2px rgba(0,0,0,0.04)`.
 - Max content width 1100px, centred, side padding 24px (16px on mobile).
 - Section spacing 64–96px desktop, 40px mobile.
 - **Announcement bar** at the very top: forest background, cream text, 12px uppercase, letter-spaced. Text: "SYNTHETIC DEMO DATA · ANNAPURNA DOES NOT CERTIFY FOOD SAFETY".
-- The **header** uses paper behind the 40px logo mark and the 22px Playfair Display wordmark. The session control shows Sign in or Sign out. Linked accounts also see Workspace and the notification bell.
+- The **header** uses paper behind the 40px logo mark and the 22px Playfair Display wordmark. The session control shows Sign in or Sign out. Signed-in accounts also see the Post · Receive · Volunteer tabs and the notification bell, which shows events from all three.
 - **Logo files:** `public/brand/logo-mark.png` (circular emblem, transparent corners), `public/brand/logo-full.jpg` (full brand artwork, use only on the About/pitch section, never in the header). Favicon and app icons live in `app/favicon.ico`, `app/icon.png`, `app/apple-icon.png`.
 - **Tagline:** "Where surplus finds purpose." Use it under the wordmark on the home page and in the page `<title>` ("Annapurna · Where surplus finds purpose").
 

@@ -4,9 +4,9 @@ import { getIdentity, isAdmin } from '@/lib/auth';
 import { demoEnabled } from '@/lib/onboarding';
 
 export default async function Loading() {
-  const { user, profile } = await getIdentity();
+  const { user, accounts, ready } = await getIdentity();
   return (
-    <SettingsFrame session={{ signedIn: Boolean(user), profile, demo: demoEnabled() }}>
+    <SettingsFrame session={{ signedIn: Boolean(user), accounts: ready ? accounts : null, userId: user?.id, demo: demoEnabled() }}>
       <div className="panel settings-panel" aria-busy="true">
         <span className="sr-only" role="status">Loading assumptions…</span>
         <div className="grid gap-5" aria-hidden="true">

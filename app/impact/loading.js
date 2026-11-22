@@ -3,9 +3,9 @@ import { getIdentity, isAdmin } from '@/lib/auth';
 import { demoEnabled } from '@/lib/onboarding';
 
 export default async function Loading() {
-  const { user, profile } = await getIdentity();
+  const { user, accounts, ready } = await getIdentity();
   return (
-    <ImpactFrame session={{ signedIn: Boolean(user), profile, demo: demoEnabled() }} editable={isAdmin(user)}>
+    <ImpactFrame session={{ signedIn: Boolean(user), accounts: ready ? accounts : null, userId: user?.id, demo: demoEnabled() }} editable={isAdmin(user)}>
       <div aria-busy="true">
         <span className="sr-only" role="status">Loading impact…</span>
         <div className="impact-metrics" aria-hidden="true">

@@ -6,7 +6,7 @@ import { runEscalation } from '../lib/escalation';
 import { settingKeys, settingsFromRows } from '../lib/settings';
 import { serverFailure } from '@/lib/api-errors';
 import { missingAccount } from '@/lib/request-errors';
-import { workspaceIdentity } from '@/lib/auth';
+import { receiverRequired, workspaceIdentity } from '@/lib/auth';
 
 export async function readImpact() {
   try {
@@ -46,11 +46,15 @@ export async function readImpact() {
   }
 }
 
-export async function readWorkspaceListings() {
+// `feed` only picks which of the user's own records to read; the account id comes from the verified session.
+export async function readWorkspaceListings(feed) {
   try {
-    const { profile, error } = await workspaceIdentity();
+    const { accounts, error } = await workspaceIdentity();
     if (error) return { error };
-    const { role, id: accountId } = profile;
+    const role = feed === 'receiver' || feed === 'volunteer' ? feed : null;
+    if (!role) return { error: missingAccount };
+    const accountId = accounts[role];
+    if (!accountId) return { error: role === 'receiver' ? receiverRequired : missingAccount };
 
   const query = role === 'receiver' ? `
     SELECT l.*, d.name AS donor_name, n.match_reason
@@ -81,8 +85,8 @@ export async function readWorkspaceListings() {
   if (!query) return { error: missingAccount };
 
     await runEscalation();
-    const accounts = role === 'receiver' ? 'receivers' : 'volunteers';
-    if (!(await database().query(`SELECT 1 FROM public.${accounts} WHERE id = $1`, [accountId])).rows.length) {
+    const table = role === 'receiver' ? 'receivers' : 'volunteers';
+    if (!(await database().query(`SELECT 1 FROM public.${table} WHERE id = $1`, [accountId])).rows.length) {
       return { error: missingAccount };
     }
     const { rows } = await database().query(query, [accountId]);
@@ -92,11 +96,11 @@ export async function readWorkspaceListings() {
   }
 }
 
-export async function readMapData() {
+export async function readMapData(includeRoutes) {
   try {
-    const { profile, error } = await workspaceIdentity();
+    const { accounts, error } = await workspaceIdentity();
     if (error) return { error };
-    const volunteerId = profile.role === 'volunteer' ? profile.id : null;
+    const volunteerId = includeRoutes ? accounts.volunteer : null;
     const { rows: [data] } = await database().query(`
       SELECT
         ARRAY(SELECT json_build_object('id', id, 'name', name, 'lat', lat, 'lng', lng)

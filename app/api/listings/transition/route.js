@@ -2,11 +2,17 @@ import { database } from '@/lib/db';
 import { validId } from '@/lib/listings';
 import { distanceKm, volunteerPickupRadiusKm } from '@/lib/matching';
 import { errorResponse, serverFailure } from '@/lib/api-errors';
-import { expiredMessage, invalidField, missingAccount, missingListing } from '@/lib/request-errors';
-import { roleForbidden, writeIdentity } from '@/lib/auth';
+import { expiredMessage, invalidField, missingListing } from '@/lib/request-errors';
+import { receiverRequired, roleForbidden, writeIdentity } from '@/lib/auth';
+
+const selfClaim = {
+  code: 'SELF_CLAIM',
+  message: "You posted this listing, so it can't be claimed by your own account.",
+};
 
 const transitions = {
   claim: {
+    account: 'receiver',
     set: "status = 'claimed', receiver_id = $2, claimed_at = now()",
     where: `l.status = 'posted' AND l.pickup_by > now() AND EXISTS (
       SELECT 1 FROM public.notifications n WHERE n.listing_id = l.id AND n.receiver_id = $2
@@ -14,16 +20,19 @@ const transitions = {
     conflict: 'This offer is no longer available to your account. Check your other offers.',
   },
   requestVolunteer: {
+    account: 'receiver',
     set: "pickup_method = 'volunteer', volunteer_requested_at = now()",
     where: "l.status = 'claimed' AND l.pickup_by > now() AND l.receiver_id = $2 AND l.pickup_method IS NULL",
     conflict: 'A pickup choice is already set or the pickup window has closed.',
   },
   collectOurselves: {
+    account: 'receiver',
     set: "pickup_method = 'self'",
     where: "l.status = 'claimed' AND l.pickup_by > now() AND l.receiver_id = $2 AND l.pickup_method IS NULL",
     conflict: 'A pickup choice is already set or the pickup window has closed.',
   },
   accept: {
+    account: 'volunteer',
     set: 'volunteer_id = $2',
     where: `l.status = 'claimed' AND l.pickup_by > now() AND l.pickup_method = 'volunteer'
       AND l.volunteer_id IS NULL AND EXISTS (
@@ -36,50 +45,47 @@ const transitions = {
     set: "status = 'collected', collected_at = now()",
     where: "l.status = 'claimed' AND l.pickup_by > now()",
     conflict: 'This pickup cannot be marked collected. Check the assignment and pickup deadline.',
-    handover: true,
+    account: 'handover',
   },
   deliver: {
     set: "status = 'delivered', delivered_at = now()",
     where: "l.status = 'collected'",
     conflict: 'This pickup cannot be marked delivered. It must be assigned to this account and collected first.',
-    handover: true,
+    account: 'handover',
   },
 };
 
-const handoverOwner = {
-  receiver: "l.pickup_method = 'self' AND l.receiver_id = $2",
-  volunteer: "l.pickup_method IS DISTINCT FROM 'self' AND l.volunteer_id = $2",
-};
+// A handover belongs to the user's receiver record (self pickup) or volunteer record (volunteer pickup).
+const handoverOwner = "((l.pickup_method = 'self' AND l.receiver_id = $2) OR (l.pickup_method IS DISTINCT FROM 'self' AND l.volunteer_id = $3))";
 
 export async function PATCH(request) {
   try {
-    const { profile, response } = await writeIdentity();
+    const { accounts, response } = await writeIdentity();
     if (response) return response;
-    const { role, id: accountId } = profile;
     const { listingId, action } = (await request.json().catch(() => null)) ?? {};
     const transition = typeof action === 'string' && Object.hasOwn(transitions, action) ? transitions[action] : null;
     if (!transition || !validId(listingId)) {
       return errorResponse(400, invalidField(null, 'Choose a valid listing and action.'));
     }
-    const allowed = transition.handover ? Object.hasOwn(handoverOwner, role)
-      : role === (action === 'accept' ? 'volunteer' : 'receiver');
-    if (!allowed) return errorResponse(403, roleForbidden);
-    const owner = transition.handover ? ' AND ' + handoverOwner[role] : '';
+    // The account follows from the action and the verified session, never from the request.
+    const handover = transition.account === 'handover';
+    const accountId = handover ? null : accounts[transition.account];
+    if (transition.account === 'receiver' && !accountId) return errorResponse(403, receiverRequired);
+    if (action === 'claim' && (await database().query(
+      'SELECT 1 FROM public.listings WHERE id = $1 AND donor_id = $2', [listingId, accounts.donor],
+    )).rowCount) return errorResponse(403, selfClaim);
     const { rows } = await database().query(
       `UPDATE public.listings AS l SET ${transition.set}
-       WHERE l.id = $1 AND ${transition.where}${owner} RETURNING l.*`,
-      [listingId, accountId],
+       WHERE l.id = $1 AND ${transition.where}${handover ? ' AND ' + handoverOwner : ''} RETURNING l.*`,
+      handover ? [listingId, accounts.receiver ?? null, accounts.volunteer] : [listingId, accountId],
     );
     if (!rows.length) {
-      const accounts = role === 'receiver' ? 'receivers' : 'volunteers';
       const { rows: [listing] } = await database().query(
         `SELECT status, receiver_id, pickup_by <= now() AS deadline_passed,
-           EXISTS (SELECT 1 FROM public.notifications WHERE listing_id = $1 AND receiver_id = $2) AS offered,
-           EXISTS (SELECT 1 FROM public.${accounts} WHERE id = $2) AS account_exists
-         FROM public.listings WHERE id = $1`, [listingId, accountId],
+           EXISTS (SELECT 1 FROM public.notifications WHERE listing_id = $1 AND receiver_id = $2) AS offered
+         FROM public.listings WHERE id = $1`, [listingId, accounts.receiver ?? null],
       );
       if (!listing) return errorResponse(404, missingListing);
-      if (!listing.account_exists) return errorResponse(404, missingAccount);
       if (action === 'claim' && !listing.offered) return errorResponse(403, roleForbidden);
       if (listing.status === 'expired' || (listing.deadline_passed && ['posted', 'claimed'].includes(listing.status))) {
         return errorResponse(409, { code: 'EXPIRED', message: expiredMessage });

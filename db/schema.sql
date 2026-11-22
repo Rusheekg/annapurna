@@ -1,4 +1,4 @@
-DROP TABLE IF EXISTS public.auth_write_limits, public.profiles, public.notifications, public.listings, public.settings,
+DROP TABLE IF EXISTS public.auth_write_limits, public.user_roles, public.profiles, public.notifications, public.listings, public.settings,
   public.volunteers, public.receivers, public.donors;
 
 CREATE TABLE public.donors (
@@ -96,4 +96,18 @@ ALTER TABLE public.auth_write_limits ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.profiles, public.auth_write_limits FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON public.profiles TO authenticated;
 CREATE POLICY read_own_profile ON public.profiles
+  FOR SELECT TO authenticated USING ((SELECT auth.uid()) = user_id);
+
+CREATE TABLE public.user_roles (
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  role text NOT NULL CHECK (role IN ('donor', 'receiver', 'volunteer')),
+  account_id integer NOT NULL CHECK (account_id > 0),
+  PRIMARY KEY (user_id, role),
+  UNIQUE (role, account_id)
+);
+
+ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.user_roles FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.user_roles TO authenticated;
+CREATE POLICY read_own_roles ON public.user_roles
   FOR SELECT TO authenticated USING ((SELECT auth.uid()) = user_id);

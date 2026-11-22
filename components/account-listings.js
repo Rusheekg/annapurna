@@ -134,7 +134,7 @@ export function useAccountListings(role, accountId, revision = 0) {
       try {
         const data = role === 'donor'
           ? await readJson('/api/listings', { signal: controller.signal })
-          : await readWorkspaceListings();
+          : await readWorkspaceListings(role);
         if (controller.signal.aborted || version !== writeVersion.current) return;
         if (data?.error) throw data.error;
         if (!data) throw networkError();
