@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useRef, useState } from 'react';
+import { GoogleButton, IconInput, NameIcon, OrDivider } from '@/components/auth-parts';
 import CodeEntry from '@/components/code-entry';
 import PasswordField from '@/components/password-field';
 import { Pending, RequestError } from '@/components/request-feedback';
@@ -12,10 +13,10 @@ const post = (body) => readJson('/api/auth/signup', {
   method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
 });
 
-export default function SignupForm() {
+export default function SignupForm({ next }) {
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
   const [sentTo, setSentTo] = useState('');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState(null);
@@ -25,8 +26,9 @@ export default function SignupForm() {
     event.preventDefault();
     if (busy.current) return;
     const target = cleanEmail(email);
-    const problem = !target ? { field: 'email', message: 'Enter a valid email address.' }
-      : passwordProblem(password) ?? (password !== confirm ? { field: 'confirm', message: 'The passwords don’t match.' } : null);
+    const problem = !name.trim() ? { field: 'name', message: 'Enter your full name.' }
+      : !target ? { field: 'email', message: 'Enter a valid email address.' }
+        : passwordProblem(password);
     if (problem) {
       setError(problem);
       return;
@@ -35,7 +37,7 @@ export default function SignupForm() {
     setPending(true);
     setError(null);
     try {
-      await post({ action: 'signup', email: target, password });
+      await post({ action: 'signup', name: name.trim(), email: target, password });
       setSentTo(target);
     } catch (failure) {
       setError(failure);
@@ -47,13 +49,14 @@ export default function SignupForm() {
 
   if (sentTo) {
     return (
-      <div className="panel settings-panel grid gap-4">
+      <div className="auth-form">
+        <h1 className="auth-heading">Check your <em>email</em></h1>
         <CodeEntry id="signup-code" email={sentTo}
           verify={async (code) => { await post({ action: 'verify', email: sentTo, code }); window.location.assign('/welcome'); }}
           resend={() => post({ action: 'resend', email: sentTo })}
-          onBack={() => { setSentTo(''); setPassword(''); setConfirm(''); }} />
+          onBack={() => { setSentTo(''); setPassword(''); }} />
         <p className="muted text-sm">
-          No code? If this email already has an account, <Link href="/login" className="auth-inline">sign in</Link> or{' '}
+          No code? If this email already has an account, <Link href="/login" className="auth-inline">log in</Link> or{' '}
           <Link href="/forgot" className="auth-inline">reset your password</Link>.
         </p>
       </div>
@@ -62,24 +65,24 @@ export default function SignupForm() {
 
   const at = (field) => error?.field === field;
   return (
-    <form className="panel settings-panel" noValidate onSubmit={submit}>
+    <form className="auth-form" noValidate onSubmit={submit}>
+      <h1 className="auth-heading">Create <em>Account</em></h1>
+      <p className="muted">Be a part of Annapurna’s mission.</p>
       <fieldset className="grid gap-4" disabled={pending}>
-        <div>
-          <label htmlFor="signup-email">Email address</label>
-          <input id="signup-email" type="email" autoComplete="email" value={email} maxLength={254}
-            aria-invalid={at('email') || undefined} aria-describedby={at('email') ? 'signup-error' : undefined}
-            onChange={(event) => setEmail(event.target.value)} />
-        </div>
+        <IconInput label="Full Name" icon={NameIcon} value={name} autoComplete="name" maxLength={100}
+          error={at('name')} errorId="signup-error" onChange={(event) => setName(event.target.value)} />
+        <IconInput label="Email Address" type="email" value={email} autoComplete="email" maxLength={254}
+          error={at('email')} errorId="signup-error" onChange={(event) => setEmail(event.target.value)} />
         <PasswordField label="Password" value={password} onChange={setPassword} autoComplete="new-password"
           error={at('password')} errorId="signup-error" hint="At least 8 characters, with letters and digits." />
-        <PasswordField label="Confirm password" value={confirm} onChange={setConfirm} autoComplete="new-password"
-          error={at('confirm')} errorId="signup-error" />
         <RequestError id="signup-error" error={error} retry={() => submit({ preventDefault() {} })} />
-        <button className="primary settings-save" type="submit">
-          {pending ? <Pending>Creating account…</Pending> : 'Create account'}
+        <button className="primary auth-submit" type="submit">
+          {pending ? <Pending>Creating account…</Pending> : 'Sign Up'}
         </button>
-        <p className="auth-links"><Link href="/login">Already have an account? Sign in</Link></p>
       </fieldset>
+      <OrDivider />
+      <GoogleButton next={next} disabled={pending} onError={setError} />
+      <p className="auth-switch">Already have an account? <Link href={next ? `/login?next=${encodeURIComponent(next)}` : '/login'}>Login</Link></p>
     </form>
   );
 }

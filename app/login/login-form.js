@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useRef, useState } from 'react';
+import { GoogleButton, IconInput, OrDivider } from '@/components/auth-parts';
 import CodeEntry from '@/components/code-entry';
 import PasswordField from '@/components/password-field';
 import { Pending, RequestError } from '@/components/request-feedback';
@@ -11,11 +12,11 @@ const post = (url, body) => readJson(url, {
   method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
 });
 
-export default function LoginForm() {
+export default function LoginForm({ next, initialError }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [pending, setPending] = useState(null);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState(initialError ? { code: 'GOOGLE_FAILED', message: initialError } : null);
   const [verifying, setVerifying] = useState('');
   const busy = useRef(false);
 
@@ -42,7 +43,8 @@ export default function LoginForm() {
 
   if (verifying) {
     return (
-      <div className="panel settings-panel">
+      <div className="auth-form">
+        <h1 className="auth-heading">Verify your <em>email</em></h1>
         <CodeEntry id="login-code" email={verifying}
           verify={async (code) => { await post('/api/auth/signup', { action: 'verify', email: verifying, code }); window.location.assign('/welcome'); }}
           resend={() => post('/api/auth/signup', { action: 'resend', email: verifying })}
@@ -52,31 +54,28 @@ export default function LoginForm() {
   }
 
   return (
-    <form className="panel settings-panel" noValidate onSubmit={(event) => { event.preventDefault(); run('signin'); }}>
+    <form className="auth-form" noValidate onSubmit={(event) => { event.preventDefault(); run('signin'); }}>
+      <h1 className="auth-heading">Welcome <em>back</em></h1>
       <fieldset className="grid gap-4" disabled={Boolean(pending)}>
-        <div>
-          <label htmlFor="login-email">Email address</label>
-          <input id="login-email" type="email" autoComplete="email" value={email} maxLength={254}
-            aria-invalid={Boolean(error) || undefined} aria-describedby={error ? 'login-error' : undefined}
-            onChange={(event) => setEmail(event.target.value)} />
-        </div>
+        <IconInput label="Email" type="email" value={email} autoComplete="email" maxLength={254}
+          error={Boolean(error)} errorId="login-error" onChange={(event) => setEmail(event.target.value)} />
         <PasswordField label="Password" value={password} onChange={setPassword} autoComplete="current-password"
           error={Boolean(error)} errorId="login-error" />
+        <div className="auth-forgot"><Link href="/forgot">Forgot password?</Link></div>
         <RequestError id="login-error" error={error} retry={() => run('signin')} />
         {error?.code === 'EMAIL_NOT_VERIFIED' && (
           <button className="secondary" type="button" onClick={() => run('resend')}>
             {pending === 'resend' ? <Pending>Sending…</Pending> : 'Send a new verification code'}
           </button>
         )}
-        <button className="primary settings-save" type="submit">
-          {pending === 'signin' ? <Pending>Signing in…</Pending> : 'Sign in'}
+        <button className="primary auth-submit" type="submit">
+          {pending === 'signin' ? <Pending>Signing in…</Pending> : 'Login'}
         </button>
-        <p className="auth-links">
-          <Link href="/signup">Sign up</Link>
-          <Link href="/forgot">Forgot password</Link>
-        </p>
-        <p className="muted text-sm">Signed up with a code before? Use Forgot password to set a password.</p>
       </fieldset>
+      <p className="muted text-sm">Signed up with a code before? Use Forgot password to set a password.</p>
+      <OrDivider />
+      <GoogleButton next={next} disabled={Boolean(pending)} onError={setError} />
+      <p className="auth-switch">New here? <Link href={next ? `/signup?next=${encodeURIComponent(next)}` : '/signup'}>Create account</Link></p>
     </form>
   );
 }

@@ -1,20 +1,18 @@
 import { redirect } from 'next/navigation';
-import SiteHeader from '@/components/site-header';
+import AuthShell from '@/components/auth-shell';
 import { getIdentity } from '@/lib/auth';
-import { demoEnabled } from '@/lib/onboarding';
+import { googleFailed, safeNext } from '@/lib/auth-input';
 import LoginForm from './login-form';
 
-export default async function LoginPage() {
+export const metadata = { title: 'Login · Annapurna' };
+
+export default async function LoginPage({ searchParams }) {
+  const { next, error } = await searchParams;
   const { user, ready } = await getIdentity();
-  if (user) redirect(ready ? '/post' : '/welcome');
+  if (user) redirect(ready ? safeNext(next) || '/post' : '/welcome');
   return (
-    <>
-      <SiteHeader demo={demoEnabled()} />
-      <main className="container workspace">
-        <p className="eyebrow mb-3">Your account</p>
-        <h1>Sign <em>in</em>.</h1>
-        <LoginForm />
-      </main>
-    </>
+    <AuthShell>
+      <LoginForm next={safeNext(next)} initialError={error ? googleFailed : ''} />
+    </AuthShell>
   );
 }

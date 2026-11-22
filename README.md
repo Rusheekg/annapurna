@@ -40,3 +40,5 @@ Set `DEMO_MODE=true` to offer unlinked seeded organisations during onboarding. E
 | Kg saved per day | Delivered weight grouped by delivery date in India Standard Time. The chart includes today and the preceding six days, with zeroes for days without deliveries. |
 
 The average travel speed is seeded at 15 km/h. Matching estimates travel time as distance ÷ speed × 60. The impact dashboard uses actual post and delivery timestamps for its average.
+
+Google sign-in: enable the Google provider in Supabase Auth and add `<your origin>/auth/callback` to the redirect URL allow-list. Until then the button shows "Google sign-in isn't available right now." Location search uses OpenStreetMap Nominatim through `/api/geocode` (login required, 1 request per second per user, 10-minute cache).

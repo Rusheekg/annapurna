@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useRef, useState } from 'react';
+import { IconInput } from '@/components/auth-parts';
 import CodeEntry from '@/components/code-entry';
 import PasswordField from '@/components/password-field';
 import { Pending, RequestError } from '@/components/request-feedback';
@@ -57,7 +58,8 @@ export default function ForgotForm() {
 
   if (step === 'code') {
     return (
-      <div className="panel settings-panel">
+      <div className="auth-form">
+        <h1 className="auth-heading">Enter your <em>code</em></h1>
         <CodeEntry id="reset-code" email={email}
           verify={async (code) => { await post({ action: 'verify', email, code }); setStep('password'); }}
           resend={() => post({ action: 'request', email })}
@@ -68,17 +70,14 @@ export default function ForgotForm() {
 
   const at = (field) => error?.field === field;
   return (
-    <form className="panel settings-panel" noValidate onSubmit={submit}>
+    <form className="auth-form" noValidate onSubmit={submit}>
+      <h1 className="auth-heading">Reset your <em>password</em></h1>
       <fieldset className="grid gap-4" disabled={pending}>
         {step === 'email' ? (
           <>
             <p className="muted text-sm">We’ll email a six-digit code. You can request at most 3 resets a day.</p>
-            <div>
-              <label htmlFor="forgot-email">Email address</label>
-              <input id="forgot-email" type="email" autoComplete="email" value={email} maxLength={254}
-                aria-invalid={Boolean(error) || undefined} aria-describedby={error ? 'forgot-error' : undefined}
-                onChange={(event) => setEmail(event.target.value)} />
-            </div>
+            <IconInput label="Email Address" type="email" value={email} autoComplete="email" maxLength={254}
+              error={Boolean(error)} errorId="forgot-error" onChange={(event) => setEmail(event.target.value)} />
           </>
         ) : (
           <>
@@ -90,10 +89,10 @@ export default function ForgotForm() {
           </>
         )}
         <RequestError id="forgot-error" error={error} retry={() => submit({ preventDefault() {} })} />
-        <button className="primary settings-save" type="submit">
-          {pending ? <Pending>Working…</Pending> : step === 'email' ? 'Send code' : 'Set password and sign in'}
+        <button className="primary auth-submit" type="submit">
+          {pending ? <Pending>Working…</Pending> : step === 'email' ? 'Send code' : 'Set password and log in'}
         </button>
-        <p className="auth-links"><Link href="/login">Back to sign in</Link></p>
+        <p className="auth-switch"><Link href="/login">Back to login</Link></p>
       </fieldset>
     </form>
   );

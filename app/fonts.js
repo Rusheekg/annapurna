@@ -1,4 +1,4 @@
-import { DM_Sans, Playfair_Display } from 'next/font/google';
+import { DM_Sans, Great_Vibes, Playfair_Display } from 'next/font/google';
 
 const bodyFont = DM_Sans({ subsets: ['latin'], weight: ['400', '500', '600'], variable: '--font-body' });
 const headingFont = Playfair_Display({
@@ -8,4 +8,7 @@ const headingFont = Playfair_Display({
   variable: '--font-heading',
 });
 
-export const fontClasses = `${bodyFont.variable} ${headingFont.variable}`;
+// Script font for one line on the sign-in pages only.
+const scriptFont = Great_Vibes({ subsets: ['latin'], weight: '400', variable: '--font-script' });
+
+export const fontClasses = `${bodyFont.variable} ${headingFont.variable} ${scriptFont.variable}`;

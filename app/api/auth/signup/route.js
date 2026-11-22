@@ -14,7 +14,9 @@ export async function POST(request) {
   if (!['signup', 'verify', 'resend'].includes(body.action)) {
     return errorResponse(400, invalidField(null, 'Choose whether to sign up, verify or resend.'));
   }
+  const name = typeof body.name === 'string' ? body.name.trim() : '';
   if (body.action === 'signup') {
+    if (!name || name.length > 100) return errorResponse(400, invalidField('name', 'Enter your full name.'));
     const problem = passwordProblem(body.password);
     if (problem) return errorResponse(400, problem);
   }
@@ -24,7 +26,7 @@ export async function POST(request) {
     const client = await authClient();
     if (!client) throw new Error('Supabase Auth is not configured.');
     const { data, error } = body.action === 'signup'
-      ? await client.auth.signUp({ email, password: body.password })
+      ? await client.auth.signUp({ email, password: body.password, options: { data: { full_name: name } } })
       : body.action === 'verify'
         ? await client.auth.verifyOtp({ email, token: body.code, type: 'signup' })
         : await client.auth.resend({ type: 'signup', email });

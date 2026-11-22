@@ -23,5 +23,5 @@ export async function proxy(request) {
 }
 
 export const config = {
-  matcher: ['/', '/login', '/signup', '/forgot', '/welcome', '/post', '/receive', '/volunteer', '/workspace', '/impact', '/settings', '/api/:path*'],
+  matcher: ['/', '/login', '/signup', '/forgot', '/auth/callback', '/welcome', '/post', '/receive', '/volunteer', '/workspace', '/impact', '/settings', '/api/:path*'],
 };

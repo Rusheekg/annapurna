@@ -412,3 +412,67 @@ button:disabled { cursor: wait; }
 .field-error { margin-top: 4px; font-size: 13px; }
 @media (max-width: 640px) { input { min-height: 44px; } }
 .auth-inline { color: var(--forest); text-decoration: underline; text-underline-offset: 4px; }
+
+/* Sign-in pages */
+.auth-page {
+  position: relative; isolation: isolate; overflow: hidden;
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 480px); align-items: center; gap: 56px;
+  min-height: 100vh; padding: 48px max(24px, calc((100vw - 1100px) / 2));
+  background: var(--cream);
+}
+.auth-wave { position: absolute; inset: 0; z-index: -1; width: 100%; height: 100%; }
+.auth-leaves { position: absolute; z-index: -1; top: 0; left: 0; width: 360px; height: 360px; }
+.auth-lotus { position: absolute; z-index: -1; bottom: 20px; left: 20px; width: 340px; opacity: .5; }
+.auth-brand { display: grid; justify-items: center; gap: 14px; text-align: center; }
+.auth-brand img { border-radius: 50%; }
+.auth-wordmark { font: 400 clamp(40px, 5vw, 60px)/1.05 var(--font-heading), serif; letter-spacing: -.01em; color: var(--forest); }
+.auth-tagline { display: flex; align-items: center; gap: 14px; width: min(100%, 420px); color: var(--forest-ink); }
+.auth-tagline span { flex: 1; height: 1px; background: var(--gold); }
+.auth-tagline p { font-size: 15px; white-space: nowrap; }
+.auth-script { margin-top: 12px; font: 400 clamp(32px, 4vw, 44px)/1.2 var(--font-script), cursive; color: var(--forest); }
+.auth-swoosh { width: min(280px, 70%); height: 16px; margin-top: -8px; }
+.auth-card {
+  padding: 40px; border: 1px solid var(--line); border-radius: 20px; background: var(--card);
+  box-shadow: 0 10px 40px rgba(34, 57, 43, .1);
+}
+.auth-form { display: grid; gap: 16px; }
+.auth-form fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
+.auth-heading { margin: 0; font: 400 clamp(32px, 4vw, 42px)/1.1 var(--font-heading), serif; color: var(--forest); }
+.auth-heading em { color: var(--sage); }
+.auth-field { position: relative; }
+.auth-field input {
+  min-height: 48px; padding: 10px 48px 10px 44px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--paper);
+}
+.auth-field input:focus { border-color: var(--forest); background: var(--card); }
+.auth-field-icon { position: absolute; top: 15px; left: 14px; color: var(--muted); pointer-events: none; }
+.auth-field .password-toggle { top: 2px; right: 2px; }
+.auth-forgot { display: flex; justify-content: flex-end; margin-top: -6px; font-size: 14px; }
+.auth-forgot a, .auth-switch a { display: inline-flex; align-items: center; min-height: 44px; color: var(--forest); font-weight: 500; text-decoration: underline; text-underline-offset: 4px; }
+.auth-submit { width: 100%; min-height: 48px; border-radius: 10px; }
+.auth-or { display: flex; align-items: center; gap: 14px; color: var(--muted); font-size: 13px; }
+.auth-or::before, .auth-or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.google-button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 48px;
+  border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--forest-ink); font-size: 14px; font-weight: 500;
+}
+.google-button:hover:not(:disabled) { background: var(--paper); }
+.auth-switch { text-align: center; font-size: 14px; color: var(--muted); }
+@media (max-width: 900px) {
+  .auth-page { grid-template-columns: minmax(0, 1fr); align-content: start; gap: 24px; padding: 24px 16px 40px; min-height: 100vh; }
+  .auth-leaves, .auth-lotus { display: none; }
+  .auth-brand { gap: 8px; }
+  .auth-brand img { width: 64px; height: 64px; }
+  .auth-wordmark { font-size: 34px; }
+  .auth-script, .auth-swoosh { display: none; }
+  .auth-card { padding: 24px 20px; }
+}
+
+/* Location search above map pickers */
+.location-search { display: flex; flex-wrap: wrap; gap: 8px; }
+.location-search input { flex: 1 1 220px; min-height: 44px; }
+.location-search .secondary { gap: 8px; min-height: 44px; padding: 10px 16px; }
+.location-results { display: grid; margin: 0; padding: 0; list-style: none; border: 1px solid var(--line); border-radius: 4px; background: var(--card); }
+.location-results li + li { border-top: 1px solid var(--line); }
+.location-results button { display: block; width: 100%; min-height: 44px; padding: 10px 14px; text-align: left; font-size: 14px; line-height: 1.4; }
+.location-results button:hover { background: var(--cream); }

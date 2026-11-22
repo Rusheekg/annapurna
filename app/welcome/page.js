@@ -15,7 +15,7 @@ export default async function WelcomePage() {
       <main className="container workspace">
         <p className="eyebrow mb-3">Account setup</p>
         <h1>Make yourself at <em>home</em>.</h1>
-        <WelcomeForm demo={demo} />
+        <WelcomeForm demo={demo} defaultName={String(user.user_metadata?.full_name ?? user.user_metadata?.name ?? '').slice(0, 100)} />
       </main>
     </>
   );

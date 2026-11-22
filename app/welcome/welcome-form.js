@@ -10,8 +10,8 @@ const LocationMap = dynamic(() => import('./location-map'), {
   loading: () => <div className="neighbourhood-map location-map" role="status">Loading map…</div>,
 });
 
-export default function WelcomeForm({ demo }) {
-  const [name, setName] = useState('');
+export default function WelcomeForm({ demo, defaultName = '' }) {
+  const [name, setName] = useState(defaultName);
   const [location, setLocation] = useState(null);
   const [error, setError] = useState(null);
   const [pending, setPending] = useState(null);
