@@ -80,6 +80,10 @@ export default function SignupForm({ next }) {
           <button className="primary auth-submit" type="submit">
             {pending ? <Pending>Creating account…</Pending> : 'Sign Up'}
           </button>
+          <p className="auth-consent">
+            By creating an account you agree to our <Link href="/terms" className="auth-inline">Terms</Link> and{' '}
+            <Link href="/privacy" className="auth-inline">Privacy Policy</Link>.
+          </p>
         </fieldset>
         <GoogleSection next={next} disabled={pending} onError={setError} />
         <p className="auth-switch">Already have an account? <Link className="auth-link" href={next ? `/login?next=${encodeURIComponent(next)}` : '/login'}>Login</Link></p>

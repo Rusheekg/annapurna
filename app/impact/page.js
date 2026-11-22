@@ -6,7 +6,7 @@ import { getIdentity, isAdmin } from '@/lib/auth';
 import { demoEnabled } from '@/lib/onboarding';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Impact · Annapurna' };
+export const metadata = { title: 'Impact' };
 
 const number = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 });
 const dayLabel = new Intl.DateTimeFormat('en-IN', { weekday: 'short', timeZone: 'UTC' });

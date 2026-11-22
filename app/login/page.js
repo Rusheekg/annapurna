@@ -4,7 +4,10 @@ import { getIdentity } from '@/lib/auth';
 import { googleFailed, safeNext } from '@/lib/auth-input';
 import LoginForm from './login-form';
 
-export const metadata = { title: 'Login · Annapurna' };
+export const metadata = {
+  title: 'Log in',
+  description: 'Log in to Annapurna to post surplus food, receive offers or pick up deliveries.',
+};
 
 export default async function LoginPage({ searchParams }) {
   const { next, error } = await searchParams;

@@ -4,7 +4,10 @@ import { getIdentity } from '@/lib/auth';
 import { safeNext } from '@/lib/auth-input';
 import SignupForm from './signup-form';
 
-export const metadata = { title: 'Create account · Annapurna' };
+export const metadata = {
+  title: 'Create account',
+  description: 'Create a free Annapurna account to rescue surplus food for nearby shelters and community kitchens.',
+};
 
 export default async function SignupPage({ searchParams }) {
   const { next } = await searchParams;

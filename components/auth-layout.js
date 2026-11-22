@@ -27,7 +27,7 @@ export function AuthLayout({ children }) {
         <path d="M100 105C140 108 175 90 186 60C155 62 120 78 100 105Z" />
       </svg>
       <div className="auth-brand">
-        <Link href="/" aria-label="Annapurna home"><Image src="/brand/logo-mark.png" width={96} height={96} alt="" priority /></Link>
+        <Link href="/"><Image src="/brand/logo-mark.png" width={96} height={96} alt="Annapurna home" priority /></Link>
         <p className="auth-wordmark">Annapurna</p>
         <div className="auth-tagline"><span aria-hidden="true" /><p>Where surplus finds purpose.</p><span aria-hidden="true" /></div>
         <p className="auth-script"><span>Reduce Food Waste.</span><span>Feed Communities.</span></p>

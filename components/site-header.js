@@ -11,7 +11,7 @@ export default function SiteHeader({ page, tagline, notificationBell, signedIn =
       <p className="announcement">{demo ? 'Synthetic demo data · ' : ''}Annapurna does not certify food safety</p>
       <div className="container masthead">
         <Link href="/" className="brand">
-          <Image src="/brand/logo-mark.png" width={40} height={40} alt="" />
+          <Image src="/brand/logo-mark.png" width={40} height={40} alt="" aria-hidden="true" />
           <span>Annapurna{tagline && <small>Where surplus finds purpose.</small>}</span>
         </Link>
         <nav className="site-nav" aria-label="Main navigation">

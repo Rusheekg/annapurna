@@ -4,6 +4,10 @@ import SiteHeader from '@/components/site-header';
 import { getIdentity } from '@/lib/auth';
 import { demoEnabled } from '@/lib/onboarding';
 
+export const metadata = {
+  description: 'Annapurna connects surplus food from hostel messes to nearby shelters and community kitchens before it spoils.',
+};
+
 export default async function HomePage({ searchParams }) {
   const { view, listingId } = await searchParams;
   if (listingId !== undefined) {

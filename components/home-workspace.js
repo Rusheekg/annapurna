@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import { Clock3, Tags, ShieldCheck } from 'lucide-react';
+import { CircleCheck, Clock3, Tags, ShieldCheck } from 'lucide-react';
 import HomeLiveFeed from '@/components/home-live-feed';
 import SiteHeader from '@/components/site-header';
 import { LiveNotificationFeed } from '@/components/ui/live-notification-feed';
@@ -111,9 +111,11 @@ function PostForm({ kgPerMeal, onPosted }) {
   const [repeating, setRepeating] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [posted, setPosted] = useState('');
   const busy = useRef(false);
   function update(key, value) {
     setError(null);
+    setPosted('');
     setForm((previous) => ({ ...previous, [key]: value }));
   }
 
@@ -130,6 +132,7 @@ function PostForm({ kgPerMeal, onPosted }) {
     busy.current = true;
     setError('');
     setNotice('');
+    setPosted('');
     setRepeating(true);
     try {
       const [listing] = await readJson('/api/listings');
@@ -148,6 +151,7 @@ function PostForm({ kgPerMeal, onPosted }) {
     if (busy.current) return;
     setError('');
     setNotice('');
+    setPosted('');
     const foodItems = [...form.selectedFoods, form.extraFood.trim()].filter(Boolean).join(', ');
     if (!foodItems) {
       setError(invalidField('foodItems', 'Choose a food item or enter one.'));
@@ -172,7 +176,7 @@ function PostForm({ kgPerMeal, onPosted }) {
         }),
       });
       setForm(initialForm());
-      setNotice(listing.message ?? 'Surplus posted.');
+      setPosted(listing.message ?? 'Posted. We’re finding nearby receivers now.');
       onPosted();
     } catch (failure) {
       setError({ ...(failure.code ? failure : networkError(true)), retry: post });
@@ -215,6 +219,9 @@ function PostForm({ kgPerMeal, onPosted }) {
         </fieldset>
         {error && (!error.field || error.field === 'donorId') && <RequestError error={error} retry={error.retry} />}
         {notice && <p className="mt-3 notice" role="status">{notice}</p>}
+        <div role="status">
+          {posted && <p className="post-success"><CircleCheck size={18} strokeWidth={1.5} aria-hidden="true" />{posted}</p>}
+        </div>
       </form>
     </section>
   );
@@ -272,7 +279,7 @@ export function Landing({ demo }) {
             <RequestError error={impactError} retry={() => setAttempt((value) => value + 1)} />
           </div>
           <div className="hero-emblem">
-            <Image src="/brand/logo-mark.png" width={320} height={320} alt="" loading="eager" />
+            <Image src="/brand/logo-mark.png" width={320} height={320} alt="Annapurna emblem" loading="eager" />
           </div>
         </div>
         <div className="gold-rule" aria-hidden="true" />

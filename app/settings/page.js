@@ -7,7 +7,7 @@ import { getIdentity, isAdmin } from '@/lib/auth';
 import { demoEnabled } from '@/lib/onboarding';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Settings · Annapurna' };
+export const metadata = { title: 'Settings' };
 
 export default async function SettingsPage() {
   const { user, accounts, ready } = await getIdentity();
