@@ -1,3 +1,4 @@
+import { hasOnlyFields, invalidBody, readBody } from '@/lib/json-body';
 import { authClient } from '@/lib/auth';
 import { errorResponse, serverFailure } from '@/lib/api-errors';
 import { codeProblem, cleanEmail, emailProblem, passwordProblem, validCode } from '@/lib/auth-input';
@@ -8,12 +9,14 @@ const rateLimited = { code: 'RATE_LIMITED', message: 'Wait a minute before reque
 
 // Sign-up: create the account, confirm the emailed 6-digit code, or send a new code. Passwords are never echoed or logged.
 export async function POST(request) {
-  const body = await request.json().catch(() => null);
+  const body = await readBody(request);
   const email = cleanEmail(body?.email);
   if (!email) return errorResponse(400, emailProblem);
   if (!['signup', 'verify', 'resend'].includes(body.action)) {
     return errorResponse(400, invalidField(null, 'Choose whether to sign up, verify or resend.'));
   }
+  const fields = { signup: ['name', 'password'], verify: ['code'], resend: [] };
+  if (!hasOnlyFields(body, ['email', 'action', ...fields[body.action]])) return invalidBody();
   const name = typeof body.name === 'string' ? body.name.trim() : '';
   if (body.action === 'signup') {
     if (!name || name.length > 100) return errorResponse(400, invalidField('name', 'Enter your full name.'));

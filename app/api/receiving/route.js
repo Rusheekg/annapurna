@@ -1,3 +1,4 @@
+import { hasOnlyFields, invalidBody, readBody } from '@/lib/json-body';
 import { roleForbidden, writeIdentity } from '@/lib/auth';
 import { errorResponse, serverFailure } from '@/lib/api-errors';
 import { validId } from '@/lib/listings';
@@ -10,19 +11,21 @@ export async function POST(request) {
   try {
     const { user, accounts, response } = await writeIdentity();
     if (response) return response;
-    const body = await request.json().catch(() => null);
+    const body = await readBody(request);
     const demoId = body?.demoId;
-    const linking = demoId != null;
+    const linking = body !== null && Object.hasOwn(body, 'demoId');
+    if (!hasOnlyFields(body, linking ? ['demoId'] : ['name', 'dailyNeed', 'lat', 'lng', 'canStoreChilled'])) return invalidBody();
     if (linking && !demoEnabled()) return errorResponse(403, roleForbidden);
     if (linking && !validId(demoId)) return errorResponse(400, invalidField('demoId', 'Choose an available demo organisation.'));
     const name = typeof body?.name === 'string' ? body.name.trim() : '';
     const { dailyNeed } = body ?? {};
     if (!linking) {
-      if (!name || name.length > 100) return errorResponse(400, invalidField('name', 'Enter an organisation name of up to 100 characters.'));
+      if (!name || name.length > 100 || name.includes('\0')) return errorResponse(400, invalidField('name', 'Enter an organisation name of up to 100 characters.'));
       if (!Number.isInteger(dailyNeed) || dailyNeed < 1 || dailyNeed > 2147483647) {
         return errorResponse(400, invalidField('dailyNeed', 'Enter a positive whole number of people.'));
       }
-      if (body.lat != null && (!Number.isFinite(body.lat) || Math.abs(body.lat) > 90 || !Number.isFinite(body.lng) || Math.abs(body.lng) > 180)) {
+      if (Object.hasOwn(body, 'canStoreChilled') && typeof body.canStoreChilled !== 'boolean') return invalidBody();
+      if ((Object.hasOwn(body, 'lat') || Object.hasOwn(body, 'lng')) && (!Number.isFinite(body.lat) || Math.abs(body.lat) > 90 || !Number.isFinite(body.lng) || Math.abs(body.lng) > 180)) {
         return errorResponse(400, invalidField('location', 'Choose a location on the map.'));
       }
     }
@@ -35,10 +38,11 @@ export async function POST(request) {
       let id = demoId;
       if (linking) {
         const { rowCount } = await client.query('SELECT id FROM public.receivers WHERE id = $1 AND is_demo FOR UPDATE', [demoId]);
-        const linked = rowCount && (await client.query(
+        if (!rowCount) return errorResponse(403, roleForbidden);
+        const linked = (await client.query(
           "SELECT 1 FROM public.user_roles WHERE role = 'receiver' AND account_id = $1", [demoId],
         )).rowCount;
-        if (!rowCount || linked) return errorResponse(409, {
+        if (linked) return errorResponse(403, {
           code: 'DEMO_UNAVAILABLE', field: 'demoId', message: 'That demo organisation is unavailable. Choose another or create your own.',
         });
       } else {

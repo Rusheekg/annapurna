@@ -1,3 +1,4 @@
+import { hasOnlyFields, invalidBody, readBody } from '@/lib/json-body';
 import { database } from '../../../lib/db';
 import { allergens, maxPortions, storageLabels } from '../../../lib/listings';
 import { insertListingAndOffers } from '../../../lib/matching';
@@ -34,27 +35,27 @@ export async function GET() {
 }
 
 async function post(request, donorId) {
-  const body = await request.json().catch(() => null);
-  if (!body) return invalid(null, 'Enter listing details.');
+  const body = await readBody(request);
+  if (!hasOnlyFields(body, ['foodItems', 'veg', 'portions', 'storage', 'allergens', 'cookedAt', 'pickupBy'])) return invalidBody();
 
   const { veg, portions, storage, cookedAt, pickupBy } = body;
   const foodItems = typeof body.foodItems === 'string' ? body.foodItems.trim() : '';
-  const cookedTime = typeof cookedAt === 'string' ? Date.parse(cookedAt) : NaN;
-  const pickupTime = typeof pickupBy === 'string' ? Date.parse(pickupBy) : NaN;
-  if (!foodItems || foodItems.length > 500) return invalid('foodItems', 'Choose a food item or enter up to 500 characters.');
+  const cookedTime = typeof cookedAt === 'string' && cookedAt.length <= 40 ? Date.parse(cookedAt) : NaN;
+  const pickupTime = typeof pickupBy === 'string' && pickupBy.length <= 40 ? Date.parse(pickupBy) : NaN;
+  if (!foodItems || foodItems.length > 500 || foodItems.includes('\0')) return invalid('foodItems', 'Choose a food item or enter up to 500 characters.');
   if (!Number.isInteger(portions) || portions < 1 || portions > maxPortions) {
     return invalid('portions', 'Portions must be between 1 and 5,000. Enter a whole number.');
   }
   if (typeof veg !== 'boolean') return invalid('veg', 'Choose a food type.');
   if (typeof storage !== 'string' || !Object.hasOwn(storageLabels, storage)) return invalid('storage', 'Choose a storage method.');
-  if (!Array.isArray(body.allergens) || !body.allergens.every((item) => allergens.includes(item))) {
+  if (!Array.isArray(body.allergens) || body.allergens.length > allergens.length || !body.allergens.every((item) => allergens.includes(item))) {
     return invalid('allergens', 'Choose recognized allergens.');
   }
   const now = Date.now();
   if (!Number.isFinite(cookedTime) || cookedTime > now || cookedTime < now - 12 * hour) {
     return invalid('cookedAt', 'Choose a cooking time within the past 12 hours.');
   }
-  if (pickupTime <= now) return errorResponse(409, { code: 'EXPIRED', message: expiredMessage, field: 'pickupBy' });
+  if (pickupTime <= now) return invalid('pickupBy', expiredMessage);
   if (!Number.isFinite(pickupTime) || pickupTime > now + 24 * hour) {
     return invalid('pickupBy', 'Choose a pickup time within the next 24 hours.');
   }

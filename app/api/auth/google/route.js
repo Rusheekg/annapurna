@@ -1,3 +1,4 @@
+import { hasOnlyFields, invalidBody, readBody } from '@/lib/json-body';
 import { authClient } from '@/lib/auth';
 import { errorResponse, serverFailure } from '@/lib/api-errors';
 import { googleUnavailable, safeNext } from '@/lib/auth-input';
@@ -5,8 +6,10 @@ import { googleUnavailable, safeNext } from '@/lib/auth-input';
 // Starts Google sign-in. It runs on the server so the PKCE verifier cookie is set here, and it checks the
 // provider is enabled first so the user never lands on a raw Supabase error page.
 export async function POST(request) {
-  const body = await request.json().catch(() => null);
-  const next = safeNext(body?.next);
+  const body = await readBody(request);
+  if (!hasOnlyFields(body, ['next'])) return invalidBody();
+  const next = safeNext(body.next);
+  if (Object.hasOwn(body, 'next') && body.next !== '' && !next) return invalidBody();
   const unavailable = { code: 'GOOGLE_UNAVAILABLE', message: googleUnavailable };
   try {
     const client = await authClient();

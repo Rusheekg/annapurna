@@ -1,3 +1,4 @@
+import { hasOnlyFields, invalidBody, readBody } from '@/lib/json-body';
 import { authClient } from '@/lib/auth';
 import { errorResponse, serverFailure } from '@/lib/api-errors';
 import { cleanEmail } from '@/lib/auth-input';
@@ -7,10 +8,11 @@ const wrongLogin = { code: 'INVALID_CREDENTIALS', message: 'Wrong email or passw
 
 // Password sign-in on the server: the session cookies are set here and the attempt limit cannot be skipped.
 export async function POST(request) {
-  const body = await request.json().catch(() => null);
-  const email = cleanEmail(body?.email);
+  const body = await readBody(request);
+  if (!hasOnlyFields(body, ['email', 'password'])) return invalidBody();
+  const email = cleanEmail(body.email);
   if (!email || typeof body?.password !== 'string' || !body.password || body.password.length > 200) {
-    return errorResponse(401, wrongLogin);
+    return invalidBody();
   }
 
   try {

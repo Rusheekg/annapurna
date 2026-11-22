@@ -39,13 +39,13 @@ try {
     await client.query(schema);
     await client.query(seed);
     await client.query('COMMIT');
-  } catch (error) {
+  } catch {
     await client.query('ROLLBACK');
     throw error;
   }
   console.log('Created and seeded the Annapurna application tables.');
 } catch (error) {
-  console.error('Database setup failed:', error.message);
+  console.error('Database setup failed.');
   process.exitCode = 1;
 } finally {
   await client.end();

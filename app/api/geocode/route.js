@@ -13,29 +13,29 @@ const lastRequest = globalThis.annapurnaGeocodeLast ??= new Map();
 
 // Location search for the map pickers. Nominatim's policy applies: no autocomplete, identified client, 1 request/second.
 export async function GET(request) {
-  const user = await getUser();
-  if (!user) return errorResponse(401, signInRequired);
-
-  const query = (new URL(request.url).searchParams.get('q') ?? '').trim();
-  if (query.length < 3 || query.length > 100) {
-    return errorResponse(400, invalidField('q', 'Enter between 3 and 100 characters to search.'));
-  }
-
-  const now = Date.now();
-  if (now - (lastRequest.get(user.id) ?? 0) < 1000) {
-    return Response.json({ error: { code: 'RATE_LIMITED', message: 'Wait a second before searching again.' } },
-      { status: 429, headers: { 'Retry-After': '1' } });
-  }
-  lastRequest.set(user.id, now);
-  if (lastRequest.size > 1000) {
-    for (const [key, time] of lastRequest) if (now - time > 60000) lastRequest.delete(key);
-  }
-
-  const key = query.toLowerCase();
-  const hit = cache.get(key);
-  if (hit && now - hit.at < cacheMs) return Response.json({ results: hit.results });
-
   try {
+    const user = await getUser();
+    if (!user) return errorResponse(401, signInRequired);
+
+    const query = (new URL(request.url).searchParams.get('q') ?? '').trim();
+    if (query.length < 3 || query.length > 100) {
+      return errorResponse(400, invalidField('q', 'Enter between 3 and 100 characters to search.'));
+    }
+
+    const now = Date.now();
+    if (now - (lastRequest.get(user.id) ?? 0) < 1000) {
+      return Response.json({ error: { code: 'RATE_LIMITED', message: 'Wait a second before searching again.' } },
+        { status: 429, headers: { 'Retry-After': '1' } });
+    }
+    lastRequest.set(user.id, now);
+    if (lastRequest.size > 1000) {
+      for (const [key, time] of lastRequest) if (now - time > 60000) lastRequest.delete(key);
+    }
+
+    const key = query.toLowerCase();
+    const hit = cache.get(key);
+    if (hit && now - hit.at < cacheMs) return Response.json({ results: hit.results });
+
     const response = await fetch(`${endpoint}&q=${encodeURIComponent(query)}`, {
       headers: { 'User-Agent': userAgent, Accept: 'application/json' },
       signal: AbortSignal.timeout(6000),

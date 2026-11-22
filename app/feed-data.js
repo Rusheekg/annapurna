@@ -1,7 +1,6 @@
 'use server';
 
 import { database } from '../lib/db';
-import { distanceKm, volunteerPickupRadiusKm } from '../lib/matching';
 import { runEscalation } from '../lib/escalation';
 import { settingKeys, settingsFromRows } from '../lib/settings';
 import { serverFailure } from '@/lib/api-errors';
@@ -65,19 +64,31 @@ export async function readWorkspaceListings(feed) {
       (n.id IS NOT NULL AND l.status = 'posted' AND l.pickup_by > now())
     ORDER BY COALESCE(n.created_at, l.created_at) DESC, l.id DESC
   ` : role === 'volunteer' ? `
-    SELECT l.*, d.name AS donor_name, r.name AS receiver_name, ${distanceKm('v', 'd')} AS pickup_distance_km,
+    SELECT l.*, d.name AS donor_name, r.name AS receiver_name, 12742 * asin(sqrt(least(1,
+            power(sin(radians(d.lat - v.lat) / 2), 2) +
+            cos(radians(v.lat)) * cos(radians(d.lat)) *
+            power(sin(radians(d.lng - v.lng) / 2), 2)
+          ))) AS pickup_distance_km,
       l.status = 'claimed' AND l.volunteer_id IS NULL
       AND COALESCE(l.volunteer_requested_at, l.claimed_at) <= now() - interval '10 minutes'
       AND v.id IN (
         SELECT nearby.id FROM public.volunteers nearby WHERE nearby.available
-        ORDER BY ${distanceKm('nearby', 'd')}, nearby.id LIMIT 3
+        ORDER BY 12742 * asin(sqrt(least(1,
+            power(sin(radians(d.lat - nearby.lat) / 2), 2) +
+            cos(radians(nearby.lat)) * cos(radians(d.lat)) *
+            power(sin(radians(d.lng - nearby.lng) / 2), 2)
+          ))), nearby.id LIMIT 3
       ) AS priority_pickup
     FROM public.listings l JOIN public.donors d ON d.id = l.donor_id
     JOIN public.receivers r ON r.id = l.receiver_id
     JOIN public.volunteers v ON v.id = $1
     WHERE l.volunteer_id = v.id OR (v.available AND l.volunteer_id IS NULL
       AND l.status = 'claimed' AND l.pickup_method = 'volunteer' AND l.pickup_by > now()
-      AND ${distanceKm('v', 'd')} <= ${volunteerPickupRadiusKm})
+      AND 12742 * asin(sqrt(least(1,
+            power(sin(radians(d.lat - v.lat) / 2), 2) +
+            cos(radians(v.lat)) * cos(radians(d.lat)) *
+            power(sin(radians(d.lng - v.lng) / 2), 2)
+          ))) <= 5)
     ORDER BY priority_pickup DESC NULLS LAST, CASE WHEN l.volunteer_id IS NULL THEN 0
       WHEN l.status IN ('claimed', 'collected') THEN 1 ELSE 2 END,
       pickup_distance_km, l.created_at DESC, l.id DESC
@@ -85,8 +96,10 @@ export async function readWorkspaceListings(feed) {
   if (!query) return { error: missingAccount };
 
     await runEscalation();
-    const table = role === 'receiver' ? 'receivers' : 'volunteers';
-    if (!(await database().query(`SELECT 1 FROM public.${table} WHERE id = $1`, [accountId])).rows.length) {
+    const accountQuery = role === 'receiver'
+      ? 'SELECT 1 FROM public.receivers WHERE id = $1'
+      : 'SELECT 1 FROM public.volunteers WHERE id = $1';
+    if (!(await database().query(accountQuery, [accountId])).rows.length) {
       return { error: missingAccount };
     }
     const { rows } = await database().query(query, [accountId]);
@@ -123,7 +136,11 @@ export async function readMapData(includeRoutes) {
              OR (l.status = 'claimed' AND l.pickup_by > now() AND (
                l.volunteer_id = v.id OR
                (l.volunteer_id IS NULL AND v.available AND l.pickup_method = 'volunteer'
-                 AND ${distanceKm('v', 'd')} <= ${volunteerPickupRadiusKm})
+                 AND 12742 * asin(sqrt(least(1,
+            power(sin(radians(d.lat - v.lat) / 2), 2) +
+            cos(radians(v.lat)) * cos(radians(d.lat)) *
+            power(sin(radians(d.lng - v.lng) / 2), 2)
+          ))) <= 5)
              ))
           ORDER BY (l.volunteer_id IS NULL), l.pickup_by, l.id
         ) job) AS routes

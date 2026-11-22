@@ -1,3 +1,4 @@
+import { hasOnlyFields, invalidBody, readBody } from '@/lib/json-body';
 import { authClient, getUser, signInRequired } from '@/lib/auth';
 import { errorResponse, serverFailure } from '@/lib/api-errors';
 import { codeProblem, cleanEmail, emailProblem, passwordProblem, validCode } from '@/lib/auth-input';
@@ -14,10 +15,12 @@ const codeLocked = {
 
 // Forgot password: request a code, verify it (signs the user in), then set a new password.
 export async function POST(request) {
-  const body = await request.json().catch(() => null);
+  const body = await readBody(request);
   if (!['request', 'verify', 'set'].includes(body?.action)) {
     return errorResponse(400, invalidField(null, 'Choose whether to request a code, verify it or set a password.'));
   }
+  const fields = { request: ['email'], verify: ['email', 'code'], set: ['password'] };
+  if (!hasOnlyFields(body, ['action', ...fields[body.action]])) return invalidBody();
   const email = body.action === 'set' ? '' : cleanEmail(body.email);
   if (body.action !== 'set' && !email) return errorResponse(400, emailProblem);
   if (body.action === 'verify' && !validCode(body.code)) return errorResponse(400, codeProblem);

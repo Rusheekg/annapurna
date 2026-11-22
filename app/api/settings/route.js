@@ -1,20 +1,23 @@
+import { hasOnlyFields, invalidBody, readBody } from '@/lib/json-body';
 import { database } from '@/lib/db';
 import { settingKeys, settingsFromRows } from '@/lib/settings';
 import { errorResponse, serverFailure } from '@/lib/api-errors';
 import { invalidField } from '@/lib/request-errors';
-import { isAdmin, writeIdentity } from '@/lib/auth';
+import { getUser, isAdmin, writeIdentity } from '@/lib/auth';
 
 export async function PATCH(request) {
   try {
-    const { user, response } = await writeIdentity({ needsProfile: false });
-    if (response) return response;
-    if (!isAdmin(user)) return errorResponse(403, { code: 'FORBIDDEN', message: 'Only administrators can change the impact assumptions.' });
-    const body = await request.json().catch(() => null);
-    const values = settingKeys.map((key) => body?.[key]);
-    const invalidIndex = values.findIndex((value) => !Number.isFinite(value) || value <= 0);
+    if (!isAdmin(await getUser())) return errorResponse(403, { code: 'FORBIDDEN', message: 'Only administrators can change the impact assumptions.' });
+    const body = await readBody(request);
+    if (!hasOnlyFields(body, settingKeys)) return invalidBody();
+    const values = settingKeys.map((key) => body[key]);
+    const invalidIndex = values.findIndex((value) => !Number.isFinite(value) || value <= 0 || value > 1000);
     if (invalidIndex !== -1) {
-      return errorResponse(400, invalidField(settingKeys[invalidIndex], 'Enter a number greater than zero.'));
+      return errorResponse(400, invalidField(settingKeys[invalidIndex], 'Enter a number greater than zero and no greater than 1,000.'));
     }
+
+    const { response } = await writeIdentity({ needsProfile: false });
+    if (response) return response;
 
     const { rows } = await database().query(
       `INSERT INTO public.settings (key, value)
